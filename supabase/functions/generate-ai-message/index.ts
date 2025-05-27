@@ -21,19 +21,31 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Get user from request
+    // Get user from request - fix authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('No authorization header');
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      { 
+        global: { 
+          headers: { 
+            Authorization: authHeader 
+          } 
+        } 
+      }
     );
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('Unauthorized');
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      throw new Error('Authentication failed');
     }
 
-    console.log('Generating AI message for type:', type);
+    console.log('Generating AI message for type:', type, 'for user:', user.id);
 
     let systemPrompt = '';
     let userPrompt = '';
