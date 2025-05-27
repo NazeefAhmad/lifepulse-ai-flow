@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Heart, Brain, MessageCircle, Calendar, Gift, ArrowLeft, Plus, Send } from 'lucide-react';
+import { Heart, Brain, MessageCircle, Calendar, Gift, ArrowLeft, Plus, Send, Sparkles, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,11 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { useRelationshipData } from '@/hooks/useRelationshipData';
+import { useAIMessageGeneration } from '@/hooks/useAIMessageGeneration';
 import { useToast } from '@/hooks/use-toast';
 
 const RelationshipCare = () => {
   const { user, signOut } = useAuth();
   const { sweetMessages, moodCheckins, reminders, loading, addSweetMessage, addMoodCheckin, addReminder } = useRelationshipData();
+  const { generateMessage, loading: aiLoading } = useAIMessageGeneration();
   const { toast } = useToast();
   
   const [customMessage, setCustomMessage] = useState('');
@@ -23,12 +24,20 @@ const RelationshipCare = () => {
   const [newReminderDate, setNewReminderDate] = useState('');
   const [newReminderType, setNewReminderType] = useState('general');
 
-  const aiMessageSuggestions = [
-    "Hey beautiful! Just thinking about how your smile brightens my entire day. Hope you're having an amazing time! ✨",
-    "Missing you already! Can't wait to hear about your day when we talk tonight. You're incredible! 💕",
-    "Random reminder: You're the best thing that happened to me. Hope your day is as wonderful as you are! 🌟",
-    "Sending you virtual hugs and good vibes! Remember, I believe in you and everything you do! 🤗",
-  ];
+  const handleGenerateAIMessage = async (type: 'sweet_message' | 'mood_suggestion' | 'reminder_suggestion', context?: any) => {
+    const message = await generateMessage({ type, context });
+    if (message) {
+      if (type === 'sweet_message') {
+        await addSweetMessage(message, true);
+      } else if (type === 'reminder_suggestion') {
+        setNewReminderTitle(message);
+        toast({
+          title: "AI Suggestion Generated!",
+          description: "Check the reminder form below - I've added a suggestion for you.",
+        });
+      }
+    }
+  };
 
   const handleSendMessage = async (message: string, isAi = false) => {
     await addSweetMessage(message, isAi);
@@ -123,36 +132,41 @@ const RelationshipCare = () => {
         </div>
       </div>
 
-      {/* Sweet Message Generator */}
+      {/* AI-Powered Sweet Message Generator */}
       <Card className="bg-gradient-to-r from-pink-50 to-purple-50 border-pink-200">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-pink-800">
-            <Brain className="h-5 w-5" />
-            Sweet Messages
+            <Sparkles className="h-5 w-5" />
+            AI Sweet Messages
           </CardTitle>
           <CardDescription>
-            Send thoughtful messages or save AI suggestions
+            Get personalized sweet messages powered by AI
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* AI Suggestions */}
-          <div className="space-y-3">
-            <h4 className="font-medium text-gray-700">AI Suggestions</h4>
-            {aiMessageSuggestions.map((message, index) => (
-              <div key={index} className="p-4 bg-white rounded-lg border border-pink-100">
-                <p className="text-gray-700 mb-3">"{message}"</p>
-                <div className="flex gap-2">
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => handleSendMessage(message, true)}
-                  >
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                    Save Message
-                  </Button>
-                </div>
-              </div>
-            ))}
+          {/* AI Generation Controls */}
+          <div className="flex gap-3 flex-wrap">
+            <Button 
+              size="sm" 
+              onClick={() => handleGenerateAIMessage('sweet_message')}
+              disabled={aiLoading}
+              className="bg-pink-600 hover:bg-pink-700"
+            >
+              {aiLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+              Generate Sweet Message
+            </Button>
+            
+            {moodCheckins.length > 0 && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => handleGenerateAIMessage('sweet_message', { recentMood: moodCheckins[0]?.mood })}
+                disabled={aiLoading}
+              >
+                {aiLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Heart className="h-4 w-4 mr-1" />}
+                Based on Recent Mood
+              </Button>
+            )}
           </div>
           
           {/* Custom Message */}
@@ -183,7 +197,10 @@ const RelationshipCare = () => {
                   <p className="text-gray-700 text-sm">{message.content}</p>
                   <div className="flex items-center gap-2 mt-2">
                     {message.is_ai_generated && (
-                      <Badge variant="outline" className="text-xs">AI Generated</Badge>
+                      <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        AI Generated
+                      </Badge>
                     )}
                     <span className="text-xs text-gray-500">
                       {new Date(message.created_at).toLocaleDateString()}
@@ -196,15 +213,15 @@ const RelationshipCare = () => {
         </CardContent>
       </Card>
 
-      {/* Upcoming Reminders */}
+      {/* Smart Reminders */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Reminders
+            Smart Reminders
           </CardTitle>
           <CardDescription>
-            Important dates and events to remember
+            AI-powered suggestions for important dates and activities
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -230,9 +247,21 @@ const RelationshipCare = () => {
             })}
           </div>
           
-          {/* Add New Reminder Form */}
+          {/* Add New Reminder Form with AI Suggestions */}
           <form onSubmit={handleAddReminder} className="space-y-3 p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-medium">Add New Reminder</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium">Add New Reminder</h4>
+              <Button 
+                type="button"
+                size="sm" 
+                variant="outline"
+                onClick={() => handleGenerateAIMessage('reminder_suggestion')}
+                disabled={aiLoading}
+              >
+                {aiLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                AI Suggestion
+              </Button>
+            </div>
             <Input
               placeholder="Reminder title"
               value={newReminderTitle}
@@ -264,7 +293,7 @@ const RelationshipCare = () => {
         </CardContent>
       </Card>
 
-      {/* Mood Check-ins */}
+      {/* Mood Check-ins with AI Insights */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -272,7 +301,7 @@ const RelationshipCare = () => {
             Mood Check-ins
           </CardTitle>
           <CardDescription>
-            Track your relationship feelings
+            Track your relationship feelings with AI insights
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -321,7 +350,7 @@ const RelationshipCare = () => {
         </CardContent>
       </Card>
 
-      {/* AI Relationship Insights */}
+      {/* Enhanced AI Relationship Insights */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-800">
@@ -329,7 +358,7 @@ const RelationshipCare = () => {
             AI Relationship Insights
           </CardTitle>
           <CardDescription>
-            Patterns and suggestions based on your data
+            Personalized patterns and suggestions based on your data
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -344,6 +373,18 @@ const RelationshipCare = () => {
                     : " Consider planning something special to brighten your relationship."
                   }
                 </p>
+                {(moodCheckins[0]?.mood.toLowerCase() === 'stressed' || moodCheckins[0]?.mood.toLowerCase() === 'sad') && (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="mt-2"
+                    onClick={() => handleGenerateAIMessage('mood_suggestion', { mood: moodCheckins[0]?.mood })}
+                    disabled={aiLoading}
+                  >
+                    {aiLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                    Get AI Suggestion
+                  </Button>
+                )}
               </div>
             )}
             
@@ -358,12 +399,13 @@ const RelationshipCare = () => {
             )}
             
             <div className="p-4 bg-white rounded-lg border border-blue-100">
-              <h4 className="font-medium text-blue-800 mb-2">Message Suggestion</h4>
+              <h4 className="font-medium text-blue-800 mb-2">AI Message Activity</h4>
               <p className="text-sm text-gray-600">
-                You've saved {sweetMessages.length} messages so far. 
+                You've saved {sweetMessages.length} messages so far 
+                ({sweetMessages.filter(m => m.is_ai_generated).length} AI-generated). 
                 {sweetMessages.length === 0 
-                  ? "Start by saving some sweet messages to build your collection!"
-                  : "Great job staying thoughtful! Consider sending one of your saved messages today."
+                  ? "Start by generating some AI sweet messages to build your collection!"
+                  : "Great job staying thoughtful! Your AI-powered messages are making your relationship stronger."
                 }
               </p>
             </div>
