@@ -11,8 +11,12 @@ import { useRelationshipData } from '@/hooks/useRelationshipData';
 import { useAIMessageGeneration } from '@/hooks/useAIMessageGeneration';
 import { useToast } from '@/hooks/use-toast';
 
-const RelationshipCare = () => {
-  const { user, signOut } = useAuth();
+interface RelationshipCareProps {
+  onBack: () => void;
+}
+
+const RelationshipCare = ({ onBack }: RelationshipCareProps) => {
+  const { user } = useAuth();
   const { sweetMessages, moodCheckins, reminders, loading, addSweetMessage, addMoodCheckin, addReminder } = useRelationshipData();
   const { generateMessage, loading: aiLoading } = useAIMessageGeneration();
   const { toast } = useToast();
@@ -121,15 +125,10 @@ const RelationshipCare = () => {
           <h2 className="text-2xl font-bold text-gray-900">Relationship Care</h2>
           <p className="text-gray-600">Welcome back, {user?.user_metadata?.full_name || 'there'}!</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => window.history.back()} variant="outline">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <Button onClick={signOut} variant="outline">
-            Sign Out
-          </Button>
-        </div>
+        <Button onClick={onBack} variant="outline">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
       </div>
 
       {/* AI-Powered Sweet Message Generator */}
