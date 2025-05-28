@@ -27,15 +27,15 @@ serve(async (req) => {
       throw new Error('No authorization header provided');
     }
 
-    // Create Supabase client with the authorization header
+    // Create Supabase client using anon key and pass through the auth header
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     
-    if (!supabaseUrl || !supabaseServiceKey) {
+    if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error('Supabase configuration missing');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: {
           Authorization: authHeader,
