@@ -21,8 +21,18 @@ export const useAIMessageGeneration = () => {
     try {
       console.log('Generating AI message with request:', request);
       
+      // Get the current session to ensure we have auth
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        throw new Error('No active session found');
+      }
+      
       const { data, error } = await supabase.functions.invoke('generate-ai-message', {
-        body: request
+        body: request,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (error) {
