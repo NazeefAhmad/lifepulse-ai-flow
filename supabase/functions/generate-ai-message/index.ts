@@ -8,6 +8,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to decode JWT token
+function decodeJWT(token: string) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Error decoding JWT:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -27,30 +42,24 @@ serve(async (req) => {
       throw new Error('No authorization header provided');
     }
 
-    // Create Supabase client using anon key and pass through the auth header
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    // Extract and verify the JWT token
+    const token = authHeader.replace('Bearer ', '');
+    const payload = decodeJWT(token);
     
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase configuration missing');
+    if (!payload || !payload.sub) {
+      console.error('Invalid JWT token or missing user ID');
+      throw new Error('Authentication failed - invalid token');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: authHeader,
-        },
-      },
-    });
-
-    // Verify the user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      console.error('Auth error:', authError);
-      throw new Error('Authentication failed');
+    // Check if token is expired
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) {
+      console.error('JWT token has expired');
+      throw new Error('Authentication failed - token expired');
     }
 
-    console.log('Generating AI message for type:', type, 'for user:', user.id);
+    const userId = payload.sub;
+    console.log('Generating AI message for type:', type, 'for user:', userId);
 
     let systemPrompt = '';
     let userPrompt = '';
