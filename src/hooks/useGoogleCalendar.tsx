@@ -1,6 +1,7 @@
 
 import { useState, useCallback } from 'react';
 import { useToast } from './use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CalendarEvent {
   id?: string;
@@ -38,7 +39,38 @@ export const useGoogleCalendar = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [authInstance, setAuthInstance] = useState<any>(null);
+  const [credentials, setCredentials] = useState<{ clientId: string; apiKey: string } | null>(null);
   const { toast } = useToast();
+
+  const fetchCredentials = async () => {
+    try {
+      const { data: clientIdData } = await supabase.functions.invoke('get-secret', {
+        body: { name: 'GOOGLE_CLIENT_ID' }
+      });
+      
+      const { data: apiKeyData } = await supabase.functions.invoke('get-secret', {
+        body: { name: 'GOOGLE_API_KEY' }
+      });
+
+      if (clientIdData?.value && apiKeyData?.value) {
+        setCredentials({
+          clientId: clientIdData.value,
+          apiKey: apiKeyData.value
+        });
+        return { clientId: clientIdData.value, apiKey: apiKeyData.value };
+      }
+      
+      throw new Error('Google credentials not found');
+    } catch (error) {
+      console.error('Error fetching Google credentials:', error);
+      toast({
+        title: "Credentials Error",
+        description: "Failed to fetch Google API credentials. Please check your setup.",
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
 
   const loadGoogleAPI = (): Promise<void> => {
     return new Promise((resolve, reject) => {
@@ -60,12 +92,18 @@ export const useGoogleCalendar = () => {
       console.log('Loading Google API...');
       await loadGoogleAPI();
       
+      console.log('Fetching credentials...');
+      const creds = credentials || await fetchCredentials();
+      if (!creds) {
+        throw new Error('No Google credentials available');
+      }
+      
       console.log('Initializing auth2...');
       return new Promise<void>((resolve, reject) => {
         window.gapi.load('auth2', async () => {
           try {
             const auth = await window.gapi.auth2.init({
-              client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+              client_id: creds.clientId,
               scope: 'https://www.googleapis.com/auth/calendar'
             });
 
@@ -77,7 +115,7 @@ export const useGoogleCalendar = () => {
             setIsConnected(isSignedIn);
 
             if (isSignedIn) {
-              await initializeGAPIClient();
+              await initializeGAPIClient(creds);
             }
             
             resolve();
@@ -95,15 +133,15 @@ export const useGoogleCalendar = () => {
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [toast, credentials]);
 
-  const initializeGAPIClient = async () => {
+  const initializeGAPIClient = async (creds: { clientId: string; apiKey: string }) => {
     return new Promise<void>((resolve, reject) => {
       window.gapi.load('client', async () => {
         try {
           await window.gapi.client.init({
-            apiKey: import.meta.env.VITE_GOOGLE_API_KEY || '',
-            clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+            apiKey: creds.apiKey,
+            clientId: creds.clientId,
             discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
             scope: 'https://www.googleapis.com/auth/calendar'
           });
@@ -127,7 +165,7 @@ export const useGoogleCalendar = () => {
         await initializeGoogleCalendar();
       }
 
-      const currentAuthInstance = authInstance || window.gapi.auth2.getAuthInstance();
+      const currentAuthInstance = authInstance || window.gapi?.auth2?.getAuthInstance();
       
       if (!currentAuthInstance) {
         throw new Error('Failed to get auth instance');
@@ -137,7 +175,11 @@ export const useGoogleCalendar = () => {
       await currentAuthInstance.signIn();
       
       setIsConnected(true);
-      await initializeGAPIClient();
+      
+      const creds = credentials || await fetchCredentials();
+      if (creds) {
+        await initializeGAPIClient(creds);
+      }
 
       toast({
         title: "Connected!",
@@ -157,7 +199,7 @@ export const useGoogleCalendar = () => {
 
   const signOutFromGoogle = async () => {
     try {
-      const currentAuthInstance = authInstance || window.gapi.auth2.getAuthInstance();
+      const currentAuthInstance = authInstance || window.gapi?.auth2?.getAuthInstance();
       if (currentAuthInstance) {
         await currentAuthInstance.signOut();
         setIsConnected(false);
