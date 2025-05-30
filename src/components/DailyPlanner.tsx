@@ -1,11 +1,11 @@
-
-import React, { useState } from 'react';
-import { ArrowLeft, Calendar, Clock, Plus, MapPin } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Calendar, Clock, Plus, MapPin, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 
 interface Event {
   id: string;
@@ -14,6 +14,8 @@ interface Event {
   duration: string;
   location?: string;
   type: 'meeting' | 'task' | 'personal' | 'break';
+  isGoogleEvent?: boolean;
+  googleEventId?: string;
 }
 
 interface DailyPlannerProps {
@@ -22,6 +24,8 @@ interface DailyPlannerProps {
 
 const DailyPlanner = ({ onBack }: DailyPlannerProps) => {
   const { toast } = useToast();
+  const { isConnected, createCalendarEvent, getUpcomingEvents } = useGoogleCalendar();
+  
   const [events, setEvents] = useState<Event[]>([
     {
       id: '1',
@@ -44,22 +48,6 @@ const DailyPlanner = ({ onBack }: DailyPlannerProps) => {
       time: '12:30',
       duration: '1 hour',
       type: 'break'
-    },
-    {
-      id: '4',
-      title: 'Team Meeting',
-      time: '14:00',
-      duration: '45 min',
-      location: 'Zoom',
-      type: 'meeting'
-    },
-    {
-      id: '5',
-      title: 'Gym Session',
-      time: '18:00',
-      duration: '1 hour',
-      location: 'Local Gym',
-      type: 'personal'
     }
   ]);
 
@@ -68,10 +56,65 @@ const DailyPlanner = ({ onBack }: DailyPlannerProps) => {
     time: '',
     duration: '',
     location: '',
-    type: 'task' as Event['type']
+    type: 'task' as Event['type'],
+    syncToGoogle: false
   });
 
-  const addEvent = () => {
+  useEffect(() => {
+    if (isConnected) {
+      loadGoogleEvents();
+    }
+  }, [isConnected]);
+
+  const loadGoogleEvents = async () => {
+    try {
+      const googleEvents = await getUpcomingEvents(10);
+      const today = new Date().toDateString();
+      
+      const todayEvents = googleEvents
+        .filter((event: any) => {
+          const eventDate = new Date(event.start.dateTime || event.start.date).toDateString();
+          return eventDate === today;
+        })
+        .map((event: any) => ({
+          id: `google-${event.id}`,
+          title: event.summary,
+          time: new Date(event.start.dateTime || event.start.date).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }),
+          duration: calculateDuration(event.start.dateTime, event.end.dateTime),
+          location: event.location,
+          type: 'meeting' as Event['type'],
+          isGoogleEvent: true,
+          googleEventId: event.id
+        }));
+
+      // Merge with existing local events, avoiding duplicates
+      setEvents(prevEvents => {
+        const localEvents = prevEvents.filter(e => !e.isGoogleEvent);
+        return [...localEvents, ...todayEvents].sort((a, b) => a.time.localeCompare(b.time));
+      });
+    } catch (error) {
+      console.error('Error loading Google events:', error);
+    }
+  };
+
+  const calculateDuration = (start: string, end: string) => {
+    if (!start || !end) return '';
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+    const diff = endTime.getTime() - startTime.getTime();
+    const minutes = Math.floor(diff / 60000);
+    
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+  };
+
+  const addEvent = async () => {
     if (!newEvent.title || !newEvent.time) {
       toast({
         title: "Error",
@@ -86,19 +129,55 @@ const DailyPlanner = ({ onBack }: DailyPlannerProps) => {
       ...newEvent
     };
 
+    // If sync to Google Calendar is enabled and connected
+    if (newEvent.syncToGoogle && isConnected) {
+      const today = new Date().toISOString().split('T')[0];
+      const startDateTime = new Date(`${today}T${newEvent.time}`);
+      const durationMinutes = parseDuration(newEvent.duration);
+      const endDateTime = new Date(startDateTime.getTime() + durationMinutes * 60000);
+
+      const googleEvent = {
+        summary: newEvent.title,
+        start: {
+          dateTime: startDateTime.toISOString(),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        },
+        end: {
+          dateTime: endDateTime.toISOString(),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        },
+        location: newEvent.location,
+        description: `Created from LifeSync AI - ${newEvent.type}`
+      };
+
+      const createdEvent = await createCalendarEvent(googleEvent);
+      if (createdEvent) {
+        event.isGoogleEvent = true;
+        event.googleEventId = createdEvent.id;
+      }
+    }
+
     setEvents([...events, event].sort((a, b) => a.time.localeCompare(b.time)));
     setNewEvent({
       title: '',
       time: '',
       duration: '',
       location: '',
-      type: 'task'
+      type: 'task',
+      syncToGoogle: false
     });
     
     toast({
       title: "Event Added",
-      description: "Your event has been added to the schedule.",
+      description: newEvent.syncToGoogle && isConnected ? 
+        "Event added to both local planner and Google Calendar." :
+        "Event added to your schedule.",
     });
+  };
+
+  const parseDuration = (duration: string): number => {
+    const match = duration.match(/(\d+)/);
+    return match ? parseInt(match[1]) * (duration.includes('hour') ? 60 : 1) : 60;
   };
 
   const getTypeColor = (type: string) => {
@@ -136,7 +215,10 @@ const DailyPlanner = ({ onBack }: DailyPlannerProps) => {
             <Calendar className="h-5 w-5" />
             {getCurrentDate()}
           </div>
-          <p className="text-blue-600 mt-1">You have {events.length} events scheduled today</p>
+          <p className="text-blue-600 mt-1">
+            You have {events.length} events scheduled today
+            {isConnected && " (synced with Google Calendar)"}
+          </p>
         </CardContent>
       </Card>
 
@@ -176,10 +258,23 @@ const DailyPlanner = ({ onBack }: DailyPlannerProps) => {
               <option value="personal">Personal</option>
               <option value="break">Break</option>
             </select>
-            <Button onClick={addEvent}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Event
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={addEvent} className="flex-1">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Event
+              </Button>
+              {isConnected && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={newEvent.syncToGoogle}
+                    onChange={(e) => setNewEvent({ ...newEvent, syncToGoogle: e.target.checked })}
+                    className="rounded"
+                  />
+                  Sync to Google
+                </label>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -195,7 +290,15 @@ const DailyPlanner = ({ onBack }: DailyPlannerProps) => {
                     {event.time}
                   </div>
                   <div>
-                    <h3 className="font-medium">{event.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium">{event.title}</h3>
+                      {event.isGoogleEvent && (
+                        <Badge variant="outline" className="text-xs">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          Google
+                        </Badge>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       {event.duration && <span>Duration: {event.duration}</span>}
                       {event.location && (
@@ -210,9 +313,20 @@ const DailyPlanner = ({ onBack }: DailyPlannerProps) => {
                     </div>
                   </div>
                 </div>
-                <Badge className={getTypeColor(event.type)}>
-                  {event.type}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge className={getTypeColor(event.type)}>
+                    {event.type}
+                  </Badge>
+                  {event.isGoogleEvent && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(`https://calendar.google.com/calendar/event?eid=${event.googleEventId}`, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

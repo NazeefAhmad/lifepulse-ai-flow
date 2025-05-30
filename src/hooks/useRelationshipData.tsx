@@ -2,29 +2,27 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from './use-toast';
 
-export interface SweetMessage {
+interface SweetMessage {
   id: string;
   content: string;
-  is_ai_generated: boolean;
   created_at: string;
+  is_ai_generated: boolean;
 }
 
-export interface MoodCheckin {
+interface MoodCheckin {
   id: string;
   mood: string;
   note: string;
   date: string;
-  created_at: string;
 }
 
-export interface Reminder {
+interface Reminder {
   id: string;
   title: string;
   date: string;
   type: string;
-  created_at: string;
 }
 
 export const useRelationshipData = () => {
@@ -35,128 +33,128 @@ export const useRelationshipData = () => {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
-    if (!user) return;
+  useEffect(() => {
+    if (user) {
+      loadData();
+    }
+  }, [user]);
 
+  const loadData = async () => {
     try {
-      const [messagesResponse, moodsResponse, remindersResponse] = await Promise.all([
-        supabase.from('sweet_messages').select('*').order('created_at', { ascending: false }),
-        supabase.from('mood_checkins').select('*').order('date', { ascending: false }),
-        supabase.from('relationship_reminders').select('*').order('date', { ascending: true })
-      ]);
+      // Load sweet messages
+      const { data: messages } = await supabase
+        .from('sweet_messages')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
 
-      if (messagesResponse.error) throw messagesResponse.error;
-      if (moodsResponse.error) throw moodsResponse.error;
-      if (remindersResponse.error) throw remindersResponse.error;
+      if (messages) setSweetMessages(messages);
 
-      setSweetMessages(messagesResponse.data || []);
-      setMoodCheckins(moodsResponse.data || []);
-      setReminders(remindersResponse.data || []);
-    } catch (error: any) {
-      console.error('Error fetching data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load data. Please try again.",
-        variant: "destructive",
-      });
+      // Load mood checkins
+      const { data: moods } = await supabase
+        .from('mood_checkins')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('date', { ascending: false });
+
+      if (moods) setMoodCheckins(moods);
+
+      // Load reminders
+      const { data: reminderData } = await supabase
+        .from('relationship_reminders')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('date', { ascending: true });
+
+      if (reminderData) setReminders(reminderData);
+    } catch (error) {
+      console.error('Error loading relationship data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [user]);
-
   const addSweetMessage = async (content: string, isAiGenerated = false) => {
-    if (!user) return;
-
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('sweet_messages')
         .insert({
-          user_id: user.id,
+          user_id: user?.id,
           content,
           is_ai_generated: isAiGenerated
-        })
-        .select()
-        .single();
+        });
 
       if (error) throw error;
 
-      setSweetMessages(prev => [data, ...prev]);
       toast({
-        title: "Success",
-        description: "Message saved successfully!",
+        title: "Message Saved",
+        description: "Your sweet message has been saved.",
       });
-    } catch (error: any) {
+
+      loadData();
+    } catch (error) {
       console.error('Error adding message:', error);
       toast({
         title: "Error",
-        description: "Failed to save message. Please try again.",
+        description: "Failed to save message.",
         variant: "destructive",
       });
     }
   };
 
   const addMoodCheckin = async (mood: string, note: string) => {
-    if (!user) return;
-
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('mood_checkins')
         .insert({
-          user_id: user.id,
+          user_id: user?.id,
           mood,
-          note
-        })
-        .select()
-        .single();
+          note,
+          date: new Date().toISOString().split('T')[0]
+        });
 
       if (error) throw error;
 
-      setMoodCheckins(prev => [data, ...prev]);
       toast({
-        title: "Success",
-        description: "Mood check-in saved successfully!",
+        title: "Mood Saved",
+        description: "Your mood check-in has been saved.",
       });
-    } catch (error: any) {
+
+      loadData();
+    } catch (error) {
       console.error('Error adding mood checkin:', error);
       toast({
         title: "Error",
-        description: "Failed to save mood check-in. Please try again.",
+        description: "Failed to save mood check-in.",
         variant: "destructive",
       });
     }
   };
 
   const addReminder = async (title: string, date: string, type: string) => {
-    if (!user) return;
-
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('relationship_reminders')
         .insert({
-          user_id: user.id,
+          user_id: user?.id,
           title,
           date,
           type
-        })
-        .select()
-        .single();
+        });
 
       if (error) throw error;
 
-      setReminders(prev => [...prev, data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
       toast({
-        title: "Success",
-        description: "Reminder added successfully!",
+        title: "Reminder Added",
+        description: "Your reminder has been saved.",
       });
-    } catch (error: any) {
+
+      loadData();
+    } catch (error) {
       console.error('Error adding reminder:', error);
       toast({
         title: "Error",
-        description: "Failed to add reminder. Please try again.",
+        description: "Failed to save reminder.",
         variant: "destructive",
       });
     }
@@ -169,7 +167,6 @@ export const useRelationshipData = () => {
     loading,
     addSweetMessage,
     addMoodCheckin,
-    addReminder,
-    refetch: fetchData
+    addReminder
   };
 };
