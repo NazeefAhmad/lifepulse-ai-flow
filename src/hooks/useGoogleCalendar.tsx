@@ -17,6 +17,28 @@ interface CalendarEvent {
   location?: string;
 }
 
+// Extend the global window object to include gapi
+declare global {
+  interface Window {
+    gapi: {
+      load: (api: string, callback: () => void) => void;
+      auth2: {
+        init: (config: any) => Promise<any>;
+        getAuthInstance: () => any;
+      };
+      client: {
+        init: (config: any) => Promise<void>;
+        calendar?: {
+          events: {
+            insert: (params: any) => Promise<any>;
+            list: (params: any) => Promise<any>;
+          };
+        };
+      };
+    };
+  }
+}
+
 export const useGoogleCalendar = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -32,7 +54,7 @@ export const useGoogleCalendar = () => {
 
       await window.gapi.load('auth2', async () => {
         const authInstance = await window.gapi.auth2.init({
-          client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID || '',
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
           scope: 'https://www.googleapis.com/auth/calendar'
         });
 
@@ -42,8 +64,8 @@ export const useGoogleCalendar = () => {
         if (isSignedIn) {
           await window.gapi.load('client', async () => {
             await window.gapi.client.init({
-              apiKey: process.env.REACT_APP_GOOGLE_API_KEY || '',
-              clientId: process.env.REACT_APP_GOOGLE_CLIENT_ID || '',
+              apiKey: import.meta.env.VITE_GOOGLE_API_KEY || '',
+              clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
               discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
               scope: 'https://www.googleapis.com/auth/calendar'
             });
@@ -80,8 +102,8 @@ export const useGoogleCalendar = () => {
       
       await window.gapi.load('client', async () => {
         await window.gapi.client.init({
-          apiKey: process.env.REACT_APP_GOOGLE_API_KEY || '',
-          clientId: process.env.REACT_APP_GOOGLE_CLIENT_ID || '',
+          apiKey: import.meta.env.VITE_GOOGLE_API_KEY || '',
+          clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
           discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
           scope: 'https://www.googleapis.com/auth/calendar'
         });
@@ -130,9 +152,11 @@ export const useGoogleCalendar = () => {
 
     setLoading(true);
     try {
-      const response = await window.gapi.client.calendar.events.insert({
-        calendarId: 'primary',
-        resource: event
+      // Use the gapi.client.request method instead of direct calendar property access
+      const response = await (window.gapi.client as any).request({
+        path: 'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+        method: 'POST',
+        body: event
       });
 
       toast({
@@ -158,13 +182,17 @@ export const useGoogleCalendar = () => {
     if (!isConnected) return [];
 
     try {
-      const response = await window.gapi.client.calendar.events.list({
-        calendarId: 'primary',
-        timeMin: new Date().toISOString(),
-        showDeleted: false,
-        singleEvents: true,
-        maxResults: maxResults,
-        orderBy: 'startTime'
+      // Use the gapi.client.request method instead of direct calendar property access
+      const response = await (window.gapi.client as any).request({
+        path: 'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+        method: 'GET',
+        params: {
+          timeMin: new Date().toISOString(),
+          showDeleted: false,
+          singleEvents: true,
+          maxResults: maxResults,
+          orderBy: 'startTime'
+        }
       });
 
       return response.result.items || [];
