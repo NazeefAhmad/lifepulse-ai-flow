@@ -18,18 +18,22 @@ interface CalendarEvent {
   location?: string;
 }
 
-// Extend the global window object to include gapi
+// Extend the global window object to include Google Identity Services
 declare global {
   interface Window {
+    google: {
+      accounts: {
+        oauth2: {
+          initTokenClient: (config: any) => any;
+        };
+      };
+    };
     gapi: {
       load: (api: string, callback: () => void) => void;
-      auth2: {
-        init: (config: any) => Promise<any>;
-        getAuthInstance: () => any;
-      };
       client: {
         init: (config: any) => Promise<void>;
         request: (params: any) => Promise<any>;
+        setToken: (token: any) => void;
       };
     };
   }
@@ -38,7 +42,8 @@ declare global {
 export const useGoogleCalendar = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [authInstance, setAuthInstance] = useState<any>(null);
+  const [tokenClient, setTokenClient] = useState<any>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<{ clientId: string; apiKey: string } | null>(null);
   const { toast } = useToast();
 
@@ -72,6 +77,21 @@ export const useGoogleCalendar = () => {
     }
   };
 
+  const loadGoogleIdentityServices = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (typeof window.google !== 'undefined') {
+        resolve();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load Google Identity Services'));
+      document.head.appendChild(script);
+    });
+  };
+
   const loadGoogleAPI = (): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (typeof window.gapi !== 'undefined') {
@@ -89,6 +109,9 @@ export const useGoogleCalendar = () => {
 
   const initializeGoogleCalendar = useCallback(async () => {
     try {
+      console.log('Loading Google Identity Services...');
+      await loadGoogleIdentityServices();
+      
       console.log('Loading Google API...');
       await loadGoogleAPI();
       
@@ -98,29 +121,38 @@ export const useGoogleCalendar = () => {
         throw new Error('No Google credentials available');
       }
       
-      console.log('Initializing auth2...');
+      console.log('Initializing GAPI client...');
       return new Promise<void>((resolve, reject) => {
-        window.gapi.load('auth2', async () => {
+        window.gapi.load('client', async () => {
           try {
-            const auth = await window.gapi.auth2.init({
-              client_id: creds.clientId,
-              scope: 'https://www.googleapis.com/auth/calendar'
+            await window.gapi.client.init({
+              apiKey: creds.apiKey,
+              discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
             });
-
-            console.log('Auth2 initialized:', auth);
-            setAuthInstance(auth);
             
-            const isSignedIn = auth.isSignedIn.get();
-            console.log('Is signed in:', isSignedIn);
-            setIsConnected(isSignedIn);
-
-            if (isSignedIn) {
-              await initializeGAPIClient(creds);
-            }
+            console.log('Initializing OAuth token client...');
+            const client = window.google.accounts.oauth2.initTokenClient({
+              client_id: creds.clientId,
+              scope: 'https://www.googleapis.com/auth/calendar',
+              callback: (tokenResponse: any) => {
+                console.log('Token received:', tokenResponse);
+                if (tokenResponse.access_token) {
+                  setAccessToken(tokenResponse.access_token);
+                  window.gapi.client.setToken({ access_token: tokenResponse.access_token });
+                  setIsConnected(true);
+                  toast({
+                    title: "Connected!",
+                    description: "Successfully connected to Google Calendar.",
+                  });
+                }
+              },
+            });
             
+            setTokenClient(client);
+            console.log('Google Calendar initialization complete');
             resolve();
           } catch (error) {
-            console.error('Error in auth2 init:', error);
+            console.error('Error initializing GAPI client:', error);
             reject(error);
           }
         });
@@ -135,56 +167,25 @@ export const useGoogleCalendar = () => {
     }
   }, [toast, credentials]);
 
-  const initializeGAPIClient = async (creds: { clientId: string; apiKey: string }) => {
-    return new Promise<void>((resolve, reject) => {
-      window.gapi.load('client', async () => {
-        try {
-          await window.gapi.client.init({
-            apiKey: creds.apiKey,
-            clientId: creds.clientId,
-            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
-            scope: 'https://www.googleapis.com/auth/calendar'
-          });
-          console.log('GAPI client initialized');
-          resolve();
-        } catch (error) {
-          console.error('Error initializing GAPI client:', error);
-          reject(error);
-        }
-      });
-    });
-  };
-
   const signInToGoogle = async () => {
     setLoading(true);
     try {
       console.log('Starting sign in process...');
       
-      if (!authInstance) {
-        console.log('Auth instance not found, initializing...');
+      if (!tokenClient) {
+        console.log('Token client not found, initializing...');
         await initializeGoogleCalendar();
       }
 
-      const currentAuthInstance = authInstance || window.gapi?.auth2?.getAuthInstance();
+      const currentTokenClient = tokenClient || window.google?.accounts?.oauth2;
       
-      if (!currentAuthInstance) {
-        throw new Error('Failed to get auth instance');
+      if (!currentTokenClient) {
+        throw new Error('Failed to get token client');
       }
 
-      console.log('Attempting to sign in...');
-      await currentAuthInstance.signIn();
+      console.log('Requesting access token...');
+      tokenClient.requestAccessToken();
       
-      setIsConnected(true);
-      
-      const creds = credentials || await fetchCredentials();
-      if (creds) {
-        await initializeGAPIClient(creds);
-      }
-
-      toast({
-        title: "Connected!",
-        description: "Successfully connected to Google Calendar.",
-      });
     } catch (error) {
       console.error('Error signing in to Google:', error);
       toast({
@@ -199,24 +200,27 @@ export const useGoogleCalendar = () => {
 
   const signOutFromGoogle = async () => {
     try {
-      const currentAuthInstance = authInstance || window.gapi?.auth2?.getAuthInstance();
-      if (currentAuthInstance) {
-        await currentAuthInstance.signOut();
-        setIsConnected(false);
-        setAuthInstance(null);
-        
-        toast({
-          title: "Disconnected",
-          description: "Successfully disconnected from Google Calendar.",
+      if (accessToken) {
+        window.google.accounts.oauth2.revoke(accessToken, () => {
+          console.log('Token revoked');
         });
       }
+      
+      setIsConnected(false);
+      setAccessToken(null);
+      window.gapi.client.setToken(null);
+      
+      toast({
+        title: "Disconnected",
+        description: "Successfully disconnected from Google Calendar.",
+      });
     } catch (error) {
       console.error('Error signing out:', error);
     }
   };
 
   const createCalendarEvent = async (event: CalendarEvent) => {
-    if (!isConnected) {
+    if (!isConnected || !accessToken) {
       toast({
         title: "Not Connected",
         description: "Please connect to Google Calendar first.",
@@ -253,7 +257,7 @@ export const useGoogleCalendar = () => {
   };
 
   const getUpcomingEvents = async (maxResults = 10) => {
-    if (!isConnected) return [];
+    if (!isConnected || !accessToken) return [];
 
     try {
       const response = await window.gapi.client.request({
