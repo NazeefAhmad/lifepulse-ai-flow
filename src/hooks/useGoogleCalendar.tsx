@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { useToast } from './use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,6 +24,7 @@ declare global {
       accounts: {
         oauth2: {
           initTokenClient: (config: any) => any;
+          revoke: (accessToken: string, callback?: () => void) => void;
         };
       };
     };
@@ -279,12 +279,58 @@ export const useGoogleCalendar = () => {
     }
   };
 
+  const createTaskEvent = async (task: { title: string; dueDate?: string; priority: string }) => {
+    if (!isConnected || !accessToken) return null;
+
+    const startDate = task.dueDate ? new Date(task.dueDate) : new Date();
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour duration
+
+    const event = {
+      summary: `Task: ${task.title}`,
+      description: `Priority: ${task.priority}\nCreated from LifeSync AI Task Manager`,
+      start: {
+        dateTime: startDate.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      },
+      end: {
+        dateTime: endDate.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      }
+    };
+
+    return await createCalendarEvent(event);
+  };
+
+  const createReminderEvent = async (reminder: { title: string; date: string; type: string }) => {
+    if (!isConnected || !accessToken) return null;
+
+    const startDate = new Date(reminder.date);
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour duration
+
+    const event = {
+      summary: `Reminder: ${reminder.title}`,
+      description: `Type: ${reminder.type}\nCreated from LifeSync AI Relationship Care`,
+      start: {
+        dateTime: startDate.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      },
+      end: {
+        dateTime: endDate.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      }
+    };
+
+    return await createCalendarEvent(event);
+  };
+
   return {
     isConnected,
     loading,
     signInToGoogle,
     signOutFromGoogle,
     createCalendarEvent,
+    createTaskEvent,
+    createReminderEvent,
     getUpcomingEvents,
     initializeGoogleCalendar
   };

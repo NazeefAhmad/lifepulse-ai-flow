@@ -1,11 +1,11 @@
-
 import React, { useState } from 'react';
-import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 
 interface Task {
   id: string;
@@ -14,6 +14,7 @@ interface Task {
   status: 'pending' | 'in-progress' | 'completed';
   dueDate?: string;
   createdAt: string;
+  syncedToGoogle?: boolean;
 }
 
 interface TaskManagerProps {
@@ -22,6 +23,8 @@ interface TaskManagerProps {
 
 const TaskManager = ({ onBack }: TaskManagerProps) => {
   const { toast } = useToast();
+  const { isConnected, createTaskEvent } = useGoogleCalendar();
+  
   const [tasks, setTasks] = useState<Task[]>([
     {
       id: '1',
@@ -49,8 +52,10 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
   ]);
   const [newTask, setNewTask] = useState('');
   const [newPriority, setNewPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [newDueDate, setNewDueDate] = useState('');
+  const [syncToGoogle, setSyncToGoogle] = useState(false);
 
-  const addTask = () => {
+  const addTask = async () => {
     if (!newTask.trim()) return;
     
     const task: Task = {
@@ -58,15 +63,35 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
       title: newTask,
       priority: newPriority,
       status: 'pending',
+      dueDate: newDueDate || undefined,
       createdAt: new Date().toISOString().split('T')[0]
     };
+
+    // Sync to Google Calendar if enabled
+    if (syncToGoogle && isConnected && newDueDate) {
+      const googleEvent = await createTaskEvent({
+        title: newTask,
+        dueDate: newDueDate,
+        priority: newPriority
+      });
+      
+      if (googleEvent) {
+        task.syncedToGoogle = true;
+        toast({
+          title: "Task Added & Synced",
+          description: "Task added to your list and Google Calendar.",
+        });
+      }
+    } else {
+      toast({
+        title: "Task Added",
+        description: "Your task has been added successfully.",
+      });
+    }
     
     setTasks([task, ...tasks]);
     setNewTask('');
-    toast({
-      title: "Task Added",
-      description: "Your task has been added successfully.",
-    });
+    setNewDueDate('');
   };
 
   const toggleTaskStatus = (id: string) => {
@@ -112,6 +137,12 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
           Back to Dashboard
         </Button>
         <h1 className="text-2xl font-bold">Smart Task Manager</h1>
+        {isConnected && (
+          <Badge variant="outline" className="bg-green-50 text-green-700">
+            <Calendar className="h-3 w-3 mr-1" />
+            Google Calendar Connected
+          </Badge>
+        )}
       </div>
 
       <Card>
@@ -119,27 +150,52 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
           <CardTitle>Add New Task</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-2">
-            <Input
-              placeholder="Enter task description..."
-              value={newTask}
-              onChange={(e) => setNewTask(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && addTask()}
-              className="flex-1"
-            />
-            <select
-              value={newPriority}
-              onChange={(e) => setNewPriority(e.target.value as 'low' | 'medium' | 'high')}
-              className="px-3 py-2 border rounded-md"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-            <Button onClick={addTask}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add
-            </Button>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter task description..."
+                value={newTask}
+                onChange={(e) => setNewTask(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addTask()}
+                className="flex-1"
+              />
+              <select
+                value={newPriority}
+                onChange={(e) => setNewPriority(e.target.value as 'low' | 'medium' | 'high')}
+                className="px-3 py-2 border rounded-md"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            
+            <div className="flex gap-2 items-center">
+              <Input
+                type="date"
+                placeholder="Due date (optional)"
+                value={newDueDate}
+                onChange={(e) => setNewDueDate(e.target.value)}
+                className="flex-1"
+              />
+              
+              {isConnected && (
+                <label className="flex items-center gap-2 text-sm whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={syncToGoogle}
+                    onChange={(e) => setSyncToGoogle(e.target.checked)}
+                    className="rounded"
+                  />
+                  Sync to Google Calendar
+                </label>
+              )}
+              
+              <Button onClick={addTask}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -159,9 +215,14 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
                     {getStatusIcon(task.status)}
                   </Button>
                   <div className="flex-1">
-                    <p className={`font-medium ${task.status === 'completed' ? 'line-through' : ''}`}>
-                      {task.title}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className={`font-medium ${task.status === 'completed' ? 'line-through' : ''}`}>
+                        {task.title}
+                      </p>
+                      {task.syncedToGoogle && (
+                        <Calendar className="h-4 w-4 text-green-600" title="Synced to Google Calendar" />
+                      )}
+                    </div>
                     {task.dueDate && (
                       <p className="text-sm text-gray-500">Due: {task.dueDate}</p>
                     )}

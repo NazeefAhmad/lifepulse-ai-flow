@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ArrowLeft, Heart, MessageCircle, Calendar, Sparkles, Send, Bot } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useRelationshipData } from '@/hooks/useRelationshipData';
 import { useAIMessageGeneration } from '@/hooks/useAIMessageGeneration';
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 
 interface RelationshipCareProps {
   onBack: () => void;
@@ -27,6 +27,7 @@ const RelationshipCare = ({ onBack }: RelationshipCareProps) => {
   } = useRelationshipData();
 
   const { generateMessage, loading: aiLoading } = useAIMessageGeneration();
+  const { isConnected, createReminderEvent } = useGoogleCalendar();
 
   const [activeTab, setActiveTab] = useState<'messages' | 'mood' | 'reminders'>('messages');
   const [newMessage, setNewMessage] = useState('');
@@ -37,7 +38,8 @@ const RelationshipCare = ({ onBack }: RelationshipCareProps) => {
   const [newReminder, setNewReminder] = useState({
     title: '',
     date: '',
-    type: 'date'
+    type: 'date',
+    syncToGoogle: false
   });
 
   const handleAddMessage = async () => {
@@ -64,12 +66,6 @@ const RelationshipCare = ({ onBack }: RelationshipCareProps) => {
     setNewMood({ mood: 'happy', note: '' });
   };
 
-  const handleAddReminder = async () => {
-    if (!newReminder.title || !newReminder.date) return;
-    await addReminder(newReminder.title, newReminder.date, newReminder.type);
-    setNewReminder({ title: '', date: '', type: 'date' });
-  };
-
   const getMoodEmoji = (mood: string) => {
     switch (mood) {
       case 'happy': return '😊';
@@ -80,6 +76,31 @@ const RelationshipCare = ({ onBack }: RelationshipCareProps) => {
       case 'stressed': return '😰';
       default: return '😊';
     }
+  };
+
+  const handleAddReminder = async () => {
+    if (!newReminder.title || !newReminder.date) return;
+    
+    // Add to local storage
+    await addReminder(newReminder.title, newReminder.date, newReminder.type);
+    
+    // Sync to Google Calendar if enabled
+    if (newReminder.syncToGoogle && isConnected) {
+      const googleEvent = await createReminderEvent({
+        title: newReminder.title,
+        date: newReminder.date,
+        type: newReminder.type
+      });
+      
+      if (googleEvent) {
+        toast({
+          title: "Reminder Added & Synced",
+          description: "Reminder added and synced to Google Calendar.",
+        });
+      }
+    }
+    
+    setNewReminder({ title: '', date: '', type: 'date', syncToGoogle: false });
   };
 
   if (loading) {
@@ -98,6 +119,12 @@ const RelationshipCare = ({ onBack }: RelationshipCareProps) => {
           Back to Dashboard
         </Button>
         <h1 className="text-2xl font-bold">Relationship Care</h1>
+        {isConnected && (
+          <Badge variant="outline" className="bg-green-50 text-green-700">
+            <Calendar className="h-3 w-3 mr-1" />
+            Google Calendar Connected
+          </Badge>
+        )}
       </div>
 
       <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
@@ -272,6 +299,19 @@ const RelationshipCare = ({ onBack }: RelationshipCareProps) => {
                 <option value="activity">Activity</option>
                 <option value="surprise">Surprise</option>
               </select>
+              
+              {isConnected && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={newReminder.syncToGoogle}
+                    onChange={(e) => setNewReminder({ ...newReminder, syncToGoogle: e.target.checked })}
+                    className="rounded"
+                  />
+                  Sync to Google Calendar
+                </label>
+              )}
+              
               <Button onClick={handleAddReminder} className="w-full">
                 Add Reminder
               </Button>
