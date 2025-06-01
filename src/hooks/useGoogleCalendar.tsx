@@ -1,214 +1,85 @@
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { useToast } from './use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect, useCallback } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 interface CalendarEvent {
-  id?: string;
   summary: string;
   description?: string;
   start: {
     dateTime: string;
-    timeZone?: string;
+    timeZone: string;
   };
   end: {
     dateTime: string;
-    timeZone?: string;
+    timeZone: string;
   };
   location?: string;
-}
-
-// Extend the global window object to include Google Identity Services
-declare global {
-  interface Window {
-    google: {
-      accounts: {
-        oauth2: {
-          initTokenClient: (config: any) => any;
-          revoke: (accessToken: string, callback?: () => void) => void;
-        };
-      };
-    };
-    gapi: {
-      load: (api: string, callback: () => void) => void;
-      client: {
-        init: (config: any) => Promise<void>;
-        request: (params: any) => Promise<any>;
-        setToken: (token: any) => void;
-      };
-    };
-  }
 }
 
 export const useGoogleCalendar = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [tokenClient, setTokenClient] = useState<any>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [credentials, setCredentials] = useState<{ clientId: string; apiKey: string } | null>(null);
   const { toast } = useToast();
-  const initializationInProgress = useRef(false);
-  const initialized = useRef(false);
 
-  const fetchCredentials = async () => {
-    try {
-      const { data: clientIdData } = await supabase.functions.invoke('get-secret', {
-        body: { name: 'GOOGLE_CLIENT_ID' }
-      });
-      
-      const { data: apiKeyData } = await supabase.functions.invoke('get-secret', {
-        body: { name: 'GOOGLE_API_KEY' }
-      });
-
-      if (clientIdData?.value && apiKeyData?.value) {
-        setCredentials({
-          clientId: clientIdData.value,
-          apiKey: apiKeyData.value
+  const initializeGapi = useCallback(async () => {
+    if (typeof window !== 'undefined' && window.gapi) {
+      try {
+        await new Promise((resolve) => window.gapi.load('auth2:client', resolve));
+        
+        await window.gapi.client.init({
+          apiKey: 'AIzaSyDwrBqcJwT6eVG9Cp_7gQbf7K1_lFXhUgE',
+          clientId: '468428975306-pu8ch1c09v3t16p4jmt94s8jf4v8v8g4.apps.googleusercontent.com',
+          discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
+          scope: 'https://www.googleapis.com/auth/calendar'
         });
-        return { clientId: clientIdData.value, apiKey: apiKeyData.value };
+
+        const authInstance = window.gapi.auth2.getAuthInstance();
+        const isSignedIn = authInstance.isSignedIn.get();
+        setIsConnected(isSignedIn);
+
+        // Listen for sign-in state changes
+        authInstance.isSignedIn.listen(setIsConnected);
+      } catch (error) {
+        console.error('Error initializing Google API:', error);
       }
-      
-      throw new Error('Google credentials not found');
-    } catch (error) {
-      console.error('Error fetching Google credentials:', error);
-      toast({
-        title: "Credentials Error",
-        description: "Failed to fetch Google API credentials. Please check your setup.",
-        variant: "destructive",
-      });
-      return null;
     }
-  };
+  }, []);
 
-  const loadGoogleIdentityServices = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (typeof window.google !== 'undefined') {
-        resolve();
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Google Identity Services'));
-      document.head.appendChild(script);
-    });
-  };
-
-  const loadGoogleAPI = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (typeof window.gapi !== 'undefined') {
-        resolve();
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://apis.google.com/js/api.js';
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Google API'));
-      document.head.appendChild(script);
-    });
-  };
-
-  const initializeGoogleCalendar = useCallback(async () => {
-    // Prevent multiple simultaneous initializations
-    if (initializationInProgress.current || initialized.current) {
-      return;
-    }
-
-    initializationInProgress.current = true;
-
-    try {
-      console.log('Loading Google Identity Services...');
-      await loadGoogleIdentityServices();
-      
-      console.log('Loading Google API...');
-      await loadGoogleAPI();
-      
-      console.log('Fetching credentials...');
-      const creds = credentials || await fetchCredentials();
-      if (!creds) {
-        throw new Error('No Google credentials available');
-      }
-      
-      console.log('Initializing GAPI client...');
-      return new Promise<void>((resolve, reject) => {
-        window.gapi.load('client', async () => {
-          try {
-            await window.gapi.client.init({
-              apiKey: creds.apiKey,
-              discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
-            });
-            
-            console.log('Initializing OAuth token client...');
-            const client = window.google.accounts.oauth2.initTokenClient({
-              client_id: creds.clientId,
-              scope: 'https://www.googleapis.com/auth/calendar',
-              callback: (tokenResponse: any) => {
-                console.log('Token received:', tokenResponse);
-                if (tokenResponse.access_token) {
-                  setAccessToken(tokenResponse.access_token);
-                  window.gapi.client.setToken({ access_token: tokenResponse.access_token });
-                  setIsConnected(true);
-                  toast({
-                    title: "Connected!",
-                    description: "Successfully connected to Google Calendar.",
-                  });
-                }
-              },
-            });
-            
-            setTokenClient(client);
-            initialized.current = true;
-            console.log('Google Calendar initialization complete');
-            resolve();
-          } catch (error) {
-            console.error('Error initializing GAPI client:', error);
-            reject(error);
-          }
-        });
-      });
-    } catch (error) {
-      console.error('Error initializing Google Calendar:', error);
-      toast({
-        title: "Calendar Error",
-        description: "Failed to initialize Google Calendar integration.",
-        variant: "destructive",
-      });
-    } finally {
-      initializationInProgress.current = false;
-    }
-  }, [toast, credentials]);
-
-  // Initialize once when component mounts
   useEffect(() => {
-    if (!initialized.current && !initializationInProgress.current) {
-      initializeGoogleCalendar();
-    }
-  }, [initializeGoogleCalendar]);
+    const loadGapi = () => {
+      if (!window.gapi) {
+        const script = document.createElement('script');
+        script.src = 'https://apis.google.com/js/api.js';
+        script.onload = initializeGapi;
+        document.head.appendChild(script);
+      } else {
+        initializeGapi();
+      }
+    };
+
+    loadGapi();
+  }, [initializeGapi]);
 
   const signInToGoogle = async () => {
     setLoading(true);
     try {
-      console.log('Starting sign in process...');
-      
-      if (!tokenClient && !initialized.current) {
-        console.log('Token client not found, initializing...');
-        await initializeGoogleCalendar();
-      }
-
-      if (tokenClient) {
-        console.log('Requesting access token...');
-        tokenClient.requestAccessToken();
-      } else {
-        throw new Error('Failed to get token client');
+      if (!window.gapi?.auth2) {
+        await initializeGapi();
       }
       
+      const authInstance = window.gapi.auth2.getAuthInstance();
+      await authInstance.signIn();
+      setIsConnected(true);
+      
+      toast({
+        title: "Google Calendar Connected",
+        description: "Successfully connected to your Google Calendar.",
+      });
     } catch (error) {
       console.error('Error signing in to Google:', error);
       toast({
         title: "Connection Failed",
-        description: "Failed to connect to Google Calendar. Please check your API credentials.",
+        description: "Failed to connect to Google Calendar. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -218,15 +89,9 @@ export const useGoogleCalendar = () => {
 
   const signOutFromGoogle = async () => {
     try {
-      if (accessToken) {
-        window.google.accounts.oauth2.revoke(accessToken, () => {
-          console.log('Token revoked');
-        });
-      }
-      
+      const authInstance = window.gapi.auth2.getAuthInstance();
+      await authInstance.signOut();
       setIsConnected(false);
-      setAccessToken(null);
-      window.gapi.client.setToken(null);
       
       toast({
         title: "Disconnected",
@@ -238,7 +103,7 @@ export const useGoogleCalendar = () => {
   };
 
   const createCalendarEvent = async (event: CalendarEvent) => {
-    if (!isConnected || !accessToken) {
+    if (!isConnected) {
       toast({
         title: "Not Connected",
         description: "Please connect to Google Calendar first.",
@@ -247,12 +112,10 @@ export const useGoogleCalendar = () => {
       return null;
     }
 
-    setLoading(true);
     try {
-      const response = await window.gapi.client.request({
-        path: 'https://www.googleapis.com/calendar/v3/calendars/primary/events',
-        method: 'POST',
-        body: event
+      const response = await window.gapi.client.calendar.events.insert({
+        calendarId: 'primary',
+        resource: event,
       });
 
       toast({
@@ -264,81 +127,53 @@ export const useGoogleCalendar = () => {
     } catch (error) {
       console.error('Error creating calendar event:', error);
       toast({
-        title: "Creation Failed",
-        description: "Failed to create calendar event.",
+        title: "Event Creation Failed",
+        description: "Failed to create calendar event. Please try again.",
         variant: "destructive",
       });
       return null;
-    } finally {
-      setLoading(false);
     }
   };
 
+  const createTaskEvent = async ({ title, dueDate, priority }: { title: string; dueDate: string; priority: string }) => {
+    if (!isConnected || !dueDate) return null;
+
+    const startDateTime = new Date(`${dueDate}T09:00:00`);
+    const endDateTime = new Date(`${dueDate}T10:00:00`);
+
+    const event = {
+      summary: `📋 ${title}`,
+      description: `Task Priority: ${priority}\n\nCreated by LifeSync`,
+      start: {
+        dateTime: startDateTime.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      },
+      end: {
+        dateTime: endDateTime.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      }
+    };
+
+    return await createCalendarEvent(event);
+  };
+
   const getUpcomingEvents = async (maxResults = 10) => {
-    if (!isConnected || !accessToken) return [];
+    if (!isConnected) return [];
 
     try {
-      const response = await window.gapi.client.request({
-        path: 'https://www.googleapis.com/calendar/v3/calendars/primary/events',
-        method: 'GET',
-        params: {
-          timeMin: new Date().toISOString(),
-          showDeleted: false,
-          singleEvents: true,
-          maxResults: maxResults,
-          orderBy: 'startTime'
-        }
+      const response = await window.gapi.client.calendar.events.list({
+        calendarId: 'primary',
+        timeMin: new Date().toISOString(),
+        maxResults: maxResults,
+        singleEvents: true,
+        orderBy: 'startTime',
       });
 
       return response.result.items || [];
     } catch (error) {
-      console.error('Error fetching events:', error);
+      console.error('Error fetching calendar events:', error);
       return [];
     }
-  };
-
-  const createTaskEvent = async (task: { title: string; dueDate?: string; priority: string }) => {
-    if (!isConnected || !accessToken) return null;
-
-    const startDate = task.dueDate ? new Date(task.dueDate) : new Date();
-    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour duration
-
-    const event = {
-      summary: `Task: ${task.title}`,
-      description: `Priority: ${task.priority}\nCreated from LifeSync AI Task Manager`,
-      start: {
-        dateTime: startDate.toISOString(),
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      },
-      end: {
-        dateTime: endDate.toISOString(),
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      }
-    };
-
-    return await createCalendarEvent(event);
-  };
-
-  const createReminderEvent = async (reminder: { title: string; date: string; type: string }) => {
-    if (!isConnected || !accessToken) return null;
-
-    const startDate = new Date(reminder.date);
-    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour duration
-
-    const event = {
-      summary: `Reminder: ${reminder.title}`,
-      description: `Type: ${reminder.type}\nCreated from LifeSync AI Relationship Care`,
-      start: {
-        dateTime: startDate.toISOString(),
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      },
-      end: {
-        dateTime: endDate.toISOString(),
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      }
-    };
-
-    return await createCalendarEvent(event);
   };
 
   return {
@@ -348,8 +183,6 @@ export const useGoogleCalendar = () => {
     signOutFromGoogle,
     createCalendarEvent,
     createTaskEvent,
-    createReminderEvent,
-    getUpcomingEvents,
-    initializeGoogleCalendar
+    getUpcomingEvents
   };
 };
