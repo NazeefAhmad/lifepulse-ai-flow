@@ -220,7 +220,7 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
                         {task.title}
                       </p>
                       {task.syncedToGoogle && (
-                        <Calendar className="h-4 w-4 text-green-600" title="Synced to Google Calendar" />
+                        <Calendar className="h-4 w-4 text-green-600" />
                       )}
                     </div>
                     {task.dueDate && (
