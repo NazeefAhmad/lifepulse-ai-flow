@@ -18,8 +18,7 @@ const GoogleCalendarIntegration = ({ onEventCreated }: GoogleCalendarIntegration
     signInToGoogle,
     signOutFromGoogle,
     createCalendarEvent,
-    getUpcomingEvents,
-    initializeGoogleCalendar
+    getUpcomingEvents
   } = useGoogleCalendar();
 
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
@@ -31,10 +30,6 @@ const GoogleCalendarIntegration = ({ onEventCreated }: GoogleCalendarIntegration
     duration: '60',
     location: ''
   });
-
-  useEffect(() => {
-    initializeGoogleCalendar();
-  }, [initializeGoogleCalendar]);
 
   useEffect(() => {
     if (isConnected) {

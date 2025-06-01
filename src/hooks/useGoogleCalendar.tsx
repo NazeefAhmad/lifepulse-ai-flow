@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useToast } from './use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -46,6 +47,8 @@ export const useGoogleCalendar = () => {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<{ clientId: string; apiKey: string } | null>(null);
   const { toast } = useToast();
+  const initializationInProgress = useRef(false);
+  const initialized = useRef(false);
 
   const fetchCredentials = async () => {
     try {
@@ -108,6 +111,13 @@ export const useGoogleCalendar = () => {
   };
 
   const initializeGoogleCalendar = useCallback(async () => {
+    // Prevent multiple simultaneous initializations
+    if (initializationInProgress.current || initialized.current) {
+      return;
+    }
+
+    initializationInProgress.current = true;
+
     try {
       console.log('Loading Google Identity Services...');
       await loadGoogleIdentityServices();
@@ -149,6 +159,7 @@ export const useGoogleCalendar = () => {
             });
             
             setTokenClient(client);
+            initialized.current = true;
             console.log('Google Calendar initialization complete');
             resolve();
           } catch (error) {
@@ -164,27 +175,34 @@ export const useGoogleCalendar = () => {
         description: "Failed to initialize Google Calendar integration.",
         variant: "destructive",
       });
+    } finally {
+      initializationInProgress.current = false;
     }
   }, [toast, credentials]);
+
+  // Initialize once when component mounts
+  useEffect(() => {
+    if (!initialized.current && !initializationInProgress.current) {
+      initializeGoogleCalendar();
+    }
+  }, [initializeGoogleCalendar]);
 
   const signInToGoogle = async () => {
     setLoading(true);
     try {
       console.log('Starting sign in process...');
       
-      if (!tokenClient) {
+      if (!tokenClient && !initialized.current) {
         console.log('Token client not found, initializing...');
         await initializeGoogleCalendar();
       }
 
-      const currentTokenClient = tokenClient || window.google?.accounts?.oauth2;
-      
-      if (!currentTokenClient) {
+      if (tokenClient) {
+        console.log('Requesting access token...');
+        tokenClient.requestAccessToken();
+      } else {
         throw new Error('Failed to get token client');
       }
-
-      console.log('Requesting access token...');
-      tokenClient.requestAccessToken();
       
     } catch (error) {
       console.error('Error signing in to Google:', error);
