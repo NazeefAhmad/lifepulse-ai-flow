@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Filter, Search } from 'lucide-react';
+import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Filter, Search, Users, Mail, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,8 @@ interface Task {
   google_event_id?: string;
   created_at: string;
   updated_at: string;
+  assigned_to_email?: string;
+  assigned_to_name?: string;
 }
 
 interface TaskManagerProps {
@@ -36,6 +38,8 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
   const [newDescription, setNewDescription] = useState('');
   const [newPriority, setNewPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [newDueDate, setNewDueDate] = useState('');
+  const [assignedToEmail, setAssignedToEmail] = useState('');
+  const [assignedToName, setAssignedToName] = useState('');
   const [syncToGoogle, setSyncToGoogle] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'in-progress' | 'completed'>('all');
@@ -59,7 +63,6 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
 
       if (error) throw error;
       
-      // Type cast to ensure proper types
       const typedTasks: Task[] = (data || []).map(task => ({
         ...task,
         priority: task.priority as 'low' | 'medium' | 'high',
@@ -79,6 +82,41 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
     }
   };
 
+  const sendTaskAssignmentEmail = async (taskData: any) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-task-assignment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          taskTitle: taskData.title,
+          taskDescription: taskData.description,
+          assignedToEmail: taskData.assigned_to_email,
+          assignedToName: taskData.assigned_to_name,
+          assignedByEmail: user?.email,
+          dueDate: taskData.due_date,
+          priority: taskData.priority
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to send email');
+      
+      toast({
+        title: "Task Assigned! 📧",
+        description: `Assignment email sent to ${taskData.assigned_to_email}`,
+      });
+    } catch (error) {
+      console.error('Error sending assignment email:', error);
+      toast({
+        title: "Email Failed",
+        description: "Task created but email notification failed to send.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const addTask = async () => {
     if (!newTask.trim() || !user) return;
     
@@ -87,7 +125,6 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
       
       let googleEventId = null;
       
-      // Create Google Calendar event if sync is enabled
       if (syncToGoogle && isConnected && newDueDate) {
         const googleEvent = await createTaskEvent({
           title: newTask,
@@ -100,23 +137,26 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
         }
       }
 
+      const taskData = {
+        user_id: user.id,
+        title: newTask,
+        description: newDescription || null,
+        priority: newPriority,
+        status: 'pending',
+        due_date: newDueDate || null,
+        google_event_id: googleEventId,
+        assigned_to_email: assignedToEmail || null,
+        assigned_to_name: assignedToName || null
+      };
+
       const { data, error } = await supabase
         .from('tasks')
-        .insert([{
-          user_id: user.id,
-          title: newTask,
-          description: newDescription || null,
-          priority: newPriority,
-          status: 'pending',
-          due_date: newDueDate || null,
-          google_event_id: googleEventId
-        }])
+        .insert([taskData])
         .select()
         .single();
 
       if (error) throw error;
 
-      // Type cast the new task
       const newTaskData: Task = {
         ...data,
         priority: data.priority as 'low' | 'medium' | 'high',
@@ -124,12 +164,25 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
       };
 
       setTasks([newTaskData, ...tasks]);
+      
+      // Send assignment email if task is assigned to someone
+      if (assignedToEmail) {
+        await sendTaskAssignmentEmail({
+          ...taskData,
+          assigned_to_email: assignedToEmail,
+          assigned_to_name: assignedToName
+        });
+      }
+
+      // Reset form
       setNewTask('');
       setNewDescription('');
       setNewDueDate('');
+      setAssignedToEmail('');
+      setAssignedToName('');
       
       toast({
-        title: "Task Added",
+        title: "Task Added! ✨",
         description: googleEventId ? "Task added and synced to Google Calendar." : "Task added successfully.",
       });
     } catch (error) {
@@ -207,7 +260,9 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
 
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         task.description?.toLowerCase().includes(searchTerm.toLowerCase());
+                         task.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         task.assigned_to_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         task.assigned_to_name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || task.status === filterStatus;
     const matchesPriority = filterPriority === 'all' || task.priority === filterPriority;
     
@@ -240,55 +295,92 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={onBack} className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={onBack} 
+            className="flex items-center gap-2 bg-white/80 backdrop-blur-sm hover:bg-white/90 border-2 border-blue-200"
+          >
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Button>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Smart Task Manager
-          </h1>
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
+              <Sparkles className="h-8 w-8 text-purple-600" />
+              Smart Task Manager
+            </h1>
+            <p className="text-gray-600 mt-1">Organize, assign, and track your tasks with AI assistance</p>
+          </div>
         </div>
         
         {isConnected && (
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-4 py-2">
             <Calendar className="h-3 w-3 mr-1" />
             Google Calendar Connected
           </Badge>
         )}
       </div>
-      <Card className="border-2 border-dashed border-blue-200 bg-blue-50/50">
-        <CardHeader>
-          <CardTitle className="text-xl text-blue-800">Add New Task</CardTitle>
+
+      {/* Enhanced Add Task Card */}
+      <Card className="border-2 border-dashed border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 shadow-lg">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl text-purple-800 flex items-center gap-2">
+            <Plus className="h-5 w-5" />
+            Create New Task
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
-                placeholder="Task title..."
+                placeholder="What needs to be done? ✨"
                 value={newTask}
                 onChange={(e) => setNewTask(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && addTask()}
-                className="font-medium"
+                className="font-medium bg-white/80 border-purple-200 focus:border-purple-400"
               />
               <Input
-                placeholder="Description (optional)"
+                placeholder="Add description (optional)"
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
+                className="bg-white/80 border-purple-200 focus:border-purple-400"
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+            {/* Assignment Section */}
+            <div className="bg-white/60 p-4 rounded-lg border border-blue-200">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="h-4 w-4 text-blue-600" />
+                <span className="font-semibold text-blue-800">Assign Task (Optional)</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input
+                  placeholder="Assignee email 📧"
+                  type="email"
+                  value={assignedToEmail}
+                  onChange={(e) => setAssignedToEmail(e.target.value)}
+                  className="bg-white border-blue-200 focus:border-blue-400"
+                />
+                <Input
+                  placeholder="Assignee name (optional)"
+                  value={assignedToName}
+                  onChange={(e) => setAssignedToName(e.target.value)}
+                  className="bg-white border-blue-200 focus:border-blue-400"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
               <select
                 value={newPriority}
                 onChange={(e) => setNewPriority(e.target.value as 'low' | 'medium' | 'high')}
-                className="px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
               >
-                <option value="low">Low Priority</option>
-                <option value="medium">Medium Priority</option>
-                <option value="high">High Priority</option>
+                <option value="low">🟢 Low Priority</option>
+                <option value="medium">🟡 Medium Priority</option>
+                <option value="high">🔴 High Priority</option>
               </select>
               
               <Input
@@ -296,82 +388,97 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
                 value={newDueDate}
                 onChange={(e) => setNewDueDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
+                className="bg-white border-purple-200 focus:border-purple-400"
               />
               
               {isConnected && (
-                <label className="flex items-center gap-2 text-sm">
+                <label className="flex items-center gap-2 text-sm text-purple-700">
                   <input
                     type="checkbox"
                     checked={syncToGoogle}
                     onChange={(e) => setSyncToGoogle(e.target.checked)}
-                    className="rounded text-blue-600 focus:ring-blue-500"
+                    className="rounded text-purple-600 focus:ring-purple-500"
                   />
-                  Sync to Google Calendar
+                  <Calendar className="h-4 w-4" />
+                  Sync to Calendar
                 </label>
               )}
               
               <Button 
                 onClick={addTask} 
                 disabled={!newTask.trim() || loading}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-2 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add Task
+                {assignedToEmail ? 'Create & Assign' : 'Create Task'}
               </Button>
             </div>
+
+            {assignedToEmail && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
+                <Mail className="h-4 w-4 text-blue-600" />
+                <span className="text-sm text-blue-800">
+                  <strong>{assignedToName || assignedToEmail}</strong> will receive an email notification about this task
+                </span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
-      <Card>
+
+      {/* Enhanced Filter Section */}
+      <Card className="bg-white/80 backdrop-blur-sm shadow-lg border border-purple-100">
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4 items-center">
             <div className="flex items-center gap-2">
-              <Search className="h-4 w-4 text-gray-500" />
+              <Search className="h-4 w-4 text-purple-500" />
               <Input
-                placeholder="Search tasks..."
+                placeholder="Search tasks... 🔍"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-64"
+                className="w-64 bg-white border-purple-200 focus:border-purple-400"
               />
             </div>
             
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-500" />
+              <Filter className="h-4 w-4 text-purple-500" />
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as any)}
-                className="px-3 py-2 border rounded-md"
+                className="px-3 py-2 border border-purple-200 rounded-md bg-white"
               >
                 <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="in-progress">In Progress</option>
-                <option value="completed">Completed</option>
+                <option value="pending">📋 Pending</option>
+                <option value="in-progress">⏳ In Progress</option>
+                <option value="completed">✅ Completed</option>
               </select>
               
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value as any)}
-                className="px-3 py-2 border rounded-md"
+                className="px-3 py-2 border border-purple-200 rounded-md bg-white"
               >
                 <option value="all">All Priority</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
+                <option value="high">🔴 High</option>
+                <option value="medium">🟡 Medium</option>
+                <option value="low">🟢 Low</option>
               </select>
             </div>
             
-            <div className="text-sm text-gray-600">
-              {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} found
+            <div className="text-sm text-purple-700 bg-purple-50 px-3 py-2 rounded-lg">
+              <strong>{filteredTasks.length}</strong> task{filteredTasks.length !== 1 ? 's' : ''} found
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Tasks List - keep existing structure but enhance styling */}
       {loading ? (
         <div className="grid gap-4">
           {[1, 2, 3].map(i => (
-            <Card key={i} className="animate-pulse">
+            <Card key={i} className="animate-pulse bg-white/60">
               <CardContent className="p-4">
-                <div className="h-16 bg-gray-200 rounded"></div>
+                <div className="h-16 bg-purple-200 rounded"></div>
               </CardContent>
             </Card>
           ))}
@@ -381,7 +488,7 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
           {filteredTasks.map((task) => (
             <Card 
               key={task.id} 
-              className={`transition-all border-2 ${getStatusColor(task.status)} ${
+              className={`transition-all border-2 bg-white/80 backdrop-blur-sm shadow-lg hover:shadow-xl ${getStatusColor(task.status)} ${
                 task.status === 'completed' ? 'opacity-75' : 'hover:shadow-md'
               }`}
             >
@@ -405,6 +512,12 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
                         {task.google_event_id && (
                           <Calendar className="h-4 w-4 text-green-600" />
                         )}
+                        {task.assigned_to_email && (
+                          <div className="flex items-center gap-1 bg-blue-100 px-2 py-1 rounded-full">
+                            <Users className="h-3 w-3 text-blue-600" />
+                            <span className="text-xs text-blue-700">{task.assigned_to_name || task.assigned_to_email}</span>
+                          </div>
+                        )}
                       </div>
                       
                       {task.description && (
@@ -413,7 +526,7 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
                       
                       <div className="flex items-center gap-2 text-sm text-gray-500">
                         {task.due_date && (
-                          <span>Due: {new Date(task.due_date).toLocaleDateString()}</span>
+                          <span>📅 Due: {new Date(task.due_date).toLocaleDateString()}</span>
                         )}
                         <span>•</span>
                         <span>Created: {new Date(task.created_at).toLocaleDateString()}</span>
@@ -422,7 +535,7 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
                     
                     <div className="flex items-center gap-2">
                       <Badge className={getPriorityColor(task.priority)}>
-                        {task.priority}
+                        {task.priority === 'high' ? '🔴' : task.priority === 'medium' ? '🟡' : '🟢'} {task.priority}
                       </Badge>
                       
                       <Badge variant="outline" className="capitalize">
@@ -445,14 +558,14 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
           ))}
           
           {filteredTasks.length === 0 && !loading && (
-            <Card className="border-2 border-dashed border-gray-200">
+            <Card className="border-2 border-dashed border-purple-200 bg-white/60">
               <CardContent className="p-8 text-center">
-                <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-600 mb-2">No tasks found</h3>
-                <p className="text-gray-500">
+                <AlertCircle className="h-12 w-12 text-purple-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-purple-600 mb-2">No tasks found</h3>
+                <p className="text-purple-500">
                   {searchTerm || filterStatus !== 'all' || filterPriority !== 'all' 
                     ? "Try adjusting your filters or search term." 
-                    : "Start by adding your first task!"}
+                    : "Start by adding your first task! ✨"}
                 </p>
               </CardContent>
             </Card>

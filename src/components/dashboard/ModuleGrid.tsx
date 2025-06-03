@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Check, Brain, Heart, BookOpen, DollarSign, Bell } from 'lucide-react';
+import { Check, Brain, Heart, BookOpen, DollarSign, Calendar } from 'lucide-react';
 import ModuleCard from './ModuleCard';
 
 interface ModuleGridProps {
@@ -13,7 +13,7 @@ const ModuleGrid = ({ onModuleClick }: ModuleGridProps) => {
       <ModuleCard
         icon={<Check className="h-6 w-6" />}
         title="Smart Task Manager"
-        description="AI-prioritized tasks for maximum productivity"
+        description="AI-prioritized tasks with team collaboration"
         color="green"
         onClick={() => onModuleClick('tasks')}
         status="3 urgent tasks"
@@ -56,12 +56,12 @@ const ModuleGrid = ({ onModuleClick }: ModuleGridProps) => {
       />
       
       <ModuleCard
-        icon={<Bell className="h-6 w-6" />}
-        title="Smart Reminders"
-        description="Never miss what matters most"
+        icon={<Calendar className="h-6 w-6" />}
+        title="Google Calendar"
+        description="Connect and sync with Google Calendar"
         color="indigo"
         onClick={() => onModuleClick('calendar')}
-        status="2 reminders set"
+        status="Connect your calendar"
       />
     </div>
   );
