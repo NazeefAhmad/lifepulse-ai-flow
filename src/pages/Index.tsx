@@ -49,7 +49,7 @@ const AppContent = () => {
       case 'relationship':
         return <RelationshipCare onBack={() => setActiveModule('dashboard')} />;
       default:
-        return <Dashboard setActiveModule={setActiveModule} />;
+        return <Dashboard />;
     }
   };
 

@@ -24,6 +24,10 @@ const Dashboard = () => {
     refreshData();
   }, [user]);
 
+  const handleModuleClick = (module: string) => {
+    setActiveView(module as 'dashboard' | 'tasks' | 'expenses' | 'journal' | 'planner' | 'relationship' | 'calendar');
+  };
+
   if (activeView === 'tasks') {
     return <TaskManager onBack={() => setActiveView('dashboard')} />;
   }
@@ -91,7 +95,7 @@ const Dashboard = () => {
           <QuickStats />
         </div>
 
-        <ModuleGrid onModuleClick={setActiveView} />
+        <ModuleGrid onModuleClick={handleModuleClick} />
         <QuickActions onDataUpdated={refreshData} />
       </div>
     </div>
