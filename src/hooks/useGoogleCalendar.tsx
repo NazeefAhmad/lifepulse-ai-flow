@@ -25,6 +25,7 @@ declare global {
 export const useGoogleCalendar = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [credentialsSet, setCredentialsSet] = useState(false);
   const { toast } = useToast();
 
   const initializeGapi = useCallback(async () => {
@@ -32,13 +33,24 @@ export const useGoogleCalendar = () => {
       try {
         await new Promise((resolve) => window.gapi.load('auth2:client', resolve));
         
+        // Get credentials from environment or show setup message
+        const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        
+        if (!apiKey || !clientId) {
+          console.log('Google API credentials not configured');
+          setCredentialsSet(false);
+          return;
+        }
+        
         await window.gapi.client.init({
-          apiKey: 'AIzaSyDwrBqcJwT6eVG9Cp_7gQbf7K1_lFXhUgE',
-          clientId: '468428975306-pu8ch1c09v3t16p4jmt94s8jf4v8v8g4.apps.googleusercontent.com',
+          apiKey: apiKey,
+          clientId: clientId,
           discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
           scope: 'https://www.googleapis.com/auth/calendar'
         });
 
+        setCredentialsSet(true);
         const authInstance = window.gapi.auth2.getAuthInstance();
         const isSignedIn = authInstance.isSignedIn.get();
         setIsConnected(isSignedIn);
@@ -47,9 +59,14 @@ export const useGoogleCalendar = () => {
         authInstance.isSignedIn.listen(setIsConnected);
       } catch (error) {
         console.error('Error initializing Google API:', error);
+        toast({
+          title: "Google Calendar Setup Required",
+          description: "Please configure your Google API credentials in the project settings.",
+          variant: "destructive",
+        });
       }
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     const loadGapi = () => {
@@ -67,6 +84,15 @@ export const useGoogleCalendar = () => {
   }, [initializeGapi]);
 
   const signInToGoogle = async () => {
+    if (!credentialsSet) {
+      toast({
+        title: "Setup Required",
+        description: "Google API credentials need to be configured first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       if (!window.gapi?.auth2) {
@@ -85,7 +111,7 @@ export const useGoogleCalendar = () => {
       console.error('Error signing in to Google:', error);
       toast({
         title: "Connection Failed",
-        description: "Failed to connect to Google Calendar. Please try again.",
+        description: "Failed to connect to Google Calendar. Please check your setup.",
         variant: "destructive",
       });
     } finally {
@@ -186,6 +212,36 @@ export const useGoogleCalendar = () => {
     return await createCalendarEvent(event);
   };
 
+  const createDailyPlannerEvent = async ({ title, description, startTime, duration, date, location }: { 
+    title: string; 
+    description?: string; 
+    startTime: string; 
+    duration: number; 
+    date: string;
+    location?: string;
+  }) => {
+    if (!isConnected || !date || !startTime) return null;
+
+    const startDateTime = new Date(`${date}T${startTime}`);
+    const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
+
+    const event = {
+      summary: `📅 ${title}`,
+      description: description ? `${description}\n\nCreated by LifeSync Daily Planner` : 'Created by LifeSync Daily Planner',
+      start: {
+        dateTime: startDateTime.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      },
+      end: {
+        dateTime: endDateTime.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      },
+      location: location
+    };
+
+    return await createCalendarEvent(event);
+  };
+
   const getUpcomingEvents = async (maxResults = 10) => {
     if (!isConnected) return [];
 
@@ -211,11 +267,13 @@ export const useGoogleCalendar = () => {
   return {
     isConnected,
     loading,
+    credentialsSet,
     signInToGoogle,
     signOutFromGoogle,
     createCalendarEvent,
     createTaskEvent,
     createReminderEvent,
+    createDailyPlannerEvent,
     getUpcomingEvents
   };
 };

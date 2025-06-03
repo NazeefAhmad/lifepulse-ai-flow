@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Calendar, Plus, ExternalLink, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
+import GoogleCalendarSetup from './GoogleCalendarSetup';
 
 interface GoogleCalendarIntegrationProps {
   onEventCreated?: (event: any) => void;
@@ -15,6 +15,7 @@ const GoogleCalendarIntegration = ({ onEventCreated }: GoogleCalendarIntegration
   const {
     isConnected,
     loading,
+    credentialsSet,
     signInToGoogle,
     signOutFromGoogle,
     createCalendarEvent,
@@ -86,6 +87,10 @@ const GoogleCalendarIntegration = ({ onEventCreated }: GoogleCalendarIntegration
       hour12: true
     });
   };
+
+  if (!credentialsSet) {
+    return <GoogleCalendarSetup />;
+  }
 
   return (
     <div className="space-y-6">

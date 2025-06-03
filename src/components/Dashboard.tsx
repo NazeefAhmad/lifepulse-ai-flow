@@ -1,99 +1,115 @@
-
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import QuickStats from '@/components/dashboard/QuickStats';
-import ModuleGrid from '@/components/dashboard/ModuleGrid';
-import AIInsights from '@/components/dashboard/AIInsights';
-import QuickActions from '@/components/dashboard/QuickActions';
-import GoogleCalendarIntegration from '@/components/GoogleCalendarIntegration';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { QuickStats } from '@/components/dashboard/QuickStats';
+import { ModuleGrid } from '@/components/dashboard/ModuleGrid';
+import { QuickActions } from '@/components/dashboard/QuickActions';
+import TaskManager from './TaskManager';
+import ExpenseLogger from './ExpenseLogger';
+import MicroJournal from './MicroJournal';
+import GoogleCalendarIntegration from './GoogleCalendarIntegration';
+import DailyPlannerManager from './DailyPlannerManager';
+import RelationshipCare from './RelationshipCare';
 
-interface DashboardProps {
-  setActiveModule: (module: string) => void;
-}
-
-const Dashboard = ({ setActiveModule }: DashboardProps) => {
-  const { refreshData } = useDashboardData();
+const Dashboard = () => {
+  const { user } = useAuth();
+  const { 
+    totalTasks, 
+    completedTasks, 
+    totalFocusTime, 
+    totalExpenses, 
+    loading: statsLoading 
+  } = useDashboardData();
   
-  const currentDate = new Date().toLocaleDateString('en-IN', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
+  const [activeView, setActiveView] = useState<'dashboard' | 'tasks' | 'expenses' | 'journal' | 'planner' | 'relationship' | 'calendar'>('dashboard');
 
-  const currentTime = new Date().toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  useEffect(() => {
+    loadDashboardData();
+  }, [user]);
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning! ☀️";
-    if (hour < 17) return "Good afternoon! 🌤️";
-    return "Good evening! 🌙";
+  const loadDashboardData = () => {
+    // This function is intentionally left empty as the useDashboardData hook handles the data loading.
+    // The purpose of this function is to trigger a re-fetch of the dashboard data when needed,
+    // for example, after a quick action is performed.
   };
 
+  if (activeView === 'tasks') {
+    return <TaskManager onBack={() => setActiveView('dashboard')} />;
+  }
+
+  if (activeView === 'expenses') {
+    return <ExpenseLogger onBack={() => setActiveView('dashboard')} />;
+  }
+
+  if (activeView === 'journal') {
+    return <MicroJournal onBack={() => setActiveView('dashboard')} />;
+  }
+
+  if (activeView === 'planner') {
+    return <DailyPlannerManager onBack={() => setActiveView('dashboard')} />;
+  }
+
+  if (activeView === 'relationship') {
+    return <RelationshipCare onBack={() => setActiveView('dashboard')} />;
+  }
+
+  if (activeView === 'calendar') {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={() => setActiveView('dashboard')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <h1 className="text-2xl font-bold">Google Calendar Integration</h1>
+        </div>
+        <GoogleCalendarIntegration />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8">
-      {/* Enhanced Welcome Header */}
-      <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 rounded-2xl p-8 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/10 backdrop-blur-sm"></div>
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold mb-2">{getGreeting()}</h1>
-              <p className="text-blue-100 text-lg">Ready to sync your life and boost productivity?</p>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Welcome back, {user?.email?.split('@')[0] || 'User'}! 👋
+              </h1>
+              <p className="text-gray-600 mt-2">Here's what's happening with your life today</p>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold">{currentTime}</p>
-              <p className="text-blue-100">{currentDate}</p>
+              <p className="text-sm text-gray-500">
+                {new Date().toLocaleDateString('en-US', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </p>
+              <p className="text-lg font-semibold text-gray-700">
+                {new Date().toLocaleTimeString('en-US', { 
+                  hour: '2-digit', 
+                  minute: '2-digit'
+                })}
+              </p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-4 mt-6">
-            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
-              <span className="text-sm font-medium">✨ All systems connected</span>
-            </div>
-            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
-              <span className="text-sm font-medium">🚀 Ready to achieve goals</span>
-            </div>
-          </div>
+
+          <QuickStats 
+            totalTasks={totalTasks}
+            completedTasks={completedTasks}
+            totalFocusTime={totalFocusTime}
+            totalExpenses={totalExpenses}
+            loading={statsLoading}
+          />
         </div>
-        
-        {/* Decorative elements */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-white/10 to-transparent rounded-full -translate-y-32 translate-x-32"></div>
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-white/10 to-transparent rounded-full translate-y-24 -translate-x-24"></div>
+
+        <ModuleGrid onModuleClick={setActiveView} />
+        <QuickActions onDataUpdated={loadDashboardData} />
       </div>
-
-      {/* Quick Stats with better spacing */}
-      <QuickStats />
-      
-      {/* Google Calendar Integration with improved design */}
-      <Card className="border-2 border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-        <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg">
-          <CardTitle className="flex items-center gap-2 text-xl">
-            📅 Calendar Integration Hub
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <GoogleCalendarIntegration />
-        </CardContent>
-      </Card>
-
-      {/* Module Grid with better spacing */}
-      <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          🎯 Life Management Modules
-        </h2>
-        <ModuleGrid setActiveModule={setActiveModule} />
-      </div>
-
-      {/* AI Insights */}
-      <AIInsights />
-      
-      {/* Enhanced Quick Actions */}
-      <QuickActions onDataUpdated={refreshData} />
     </div>
   );
 };
