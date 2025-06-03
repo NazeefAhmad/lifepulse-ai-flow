@@ -16,6 +16,12 @@ interface CalendarEvent {
   location?: string;
 }
 
+declare global {
+  interface Window {
+    gapi: any;
+  }
+}
+
 export const useGoogleCalendar = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -113,9 +119,10 @@ export const useGoogleCalendar = () => {
     }
 
     try {
-      const response = await window.gapi.client.calendar.events.insert({
-        calendarId: 'primary',
-        resource: event,
+      const response = await window.gapi.client.request({
+        path: `https://www.googleapis.com/calendar/v3/calendars/primary/events`,
+        method: 'POST',
+        body: event,
       });
 
       toast({
@@ -157,16 +164,41 @@ export const useGoogleCalendar = () => {
     return await createCalendarEvent(event);
   };
 
+  const createReminderEvent = async ({ title, date, type }: { title: string; date: string; type: string }) => {
+    if (!isConnected || !date) return null;
+
+    const startDateTime = new Date(`${date}T10:00:00`);
+    const endDateTime = new Date(`${date}T10:30:00`);
+
+    const event = {
+      summary: `💕 ${title}`,
+      description: `Reminder Type: ${type}\n\nCreated by LifeSync Relationship Care`,
+      start: {
+        dateTime: startDateTime.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      },
+      end: {
+        dateTime: endDateTime.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      }
+    };
+
+    return await createCalendarEvent(event);
+  };
+
   const getUpcomingEvents = async (maxResults = 10) => {
     if (!isConnected) return [];
 
     try {
-      const response = await window.gapi.client.calendar.events.list({
-        calendarId: 'primary',
-        timeMin: new Date().toISOString(),
-        maxResults: maxResults,
-        singleEvents: true,
-        orderBy: 'startTime',
+      const response = await window.gapi.client.request({
+        path: `https://www.googleapis.com/calendar/v3/calendars/primary/events`,
+        method: 'GET',
+        params: {
+          timeMin: new Date().toISOString(),
+          maxResults: maxResults,
+          singleEvents: true,
+          orderBy: 'startTime',
+        },
       });
 
       return response.result.items || [];
@@ -183,6 +215,7 @@ export const useGoogleCalendar = () => {
     signOutFromGoogle,
     createCalendarEvent,
     createTaskEvent,
+    createReminderEvent,
     getUpcomingEvents
   };
 };

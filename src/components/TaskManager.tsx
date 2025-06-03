@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Filter, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,7 +58,15 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTasks(data || []);
+      
+      // Type cast to ensure proper types
+      const typedTasks: Task[] = (data || []).map(task => ({
+        ...task,
+        priority: task.priority as 'low' | 'medium' | 'high',
+        status: task.status as 'pending' | 'in-progress' | 'completed'
+      }));
+      
+      setTasks(typedTasks);
     } catch (error) {
       console.error('Error loading tasks:', error);
       toast({
@@ -109,7 +116,14 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
 
       if (error) throw error;
 
-      setTasks([data, ...tasks]);
+      // Type cast the new task
+      const newTaskData: Task = {
+        ...data,
+        priority: data.priority as 'low' | 'medium' | 'high',
+        status: data.status as 'pending' | 'in-progress' | 'completed'
+      };
+
+      setTasks([newTaskData, ...tasks]);
       setNewTask('');
       setNewDescription('');
       setNewDueDate('');
@@ -147,7 +161,7 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
       if (error) throw error;
 
       setTasks(tasks.map(task => 
-        task.id === taskId ? { ...task, status: newStatus as any } : task
+        task.id === taskId ? { ...task, status: newStatus as 'pending' | 'in-progress' | 'completed' } : task
       ));
 
       if (newStatus === 'completed') {
@@ -245,8 +259,6 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
           </Badge>
         )}
       </div>
-
-      {/* Add New Task Card */}
       <Card className="border-2 border-dashed border-blue-200 bg-blue-50/50">
         <CardHeader>
           <CardTitle className="text-xl text-blue-800">Add New Task</CardTitle>
@@ -310,8 +322,6 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
           </div>
         </CardContent>
       </Card>
-
-      {/* Filters and Search */}
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4 items-center">
@@ -356,8 +366,6 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
           </div>
         </CardContent>
       </Card>
-
-      {/* Tasks List */}
       {loading ? (
         <div className="grid gap-4">
           {[1, 2, 3].map(i => (
