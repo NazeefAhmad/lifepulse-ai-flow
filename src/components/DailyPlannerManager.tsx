@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Clock, MapPin, Calendar, Trash2, Edit3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,7 +63,14 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
         .order('start_time', { ascending: true });
 
       if (error) throw error;
-      setEvents(data || []);
+      
+      // Type cast the data to ensure proper types
+      const typedEvents: DailyEvent[] = (data || []).map(event => ({
+        ...event,
+        event_type: event.event_type as 'meeting' | 'task' | 'personal' | 'break'
+      }));
+      
+      setEvents(typedEvents);
     } catch (error) {
       console.error('Error loading events:', error);
       toast({
@@ -119,7 +125,13 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
 
       if (error) throw error;
 
-      setEvents([...events, data]);
+      // Type cast the new event
+      const newEventData: DailyEvent = {
+        ...data,
+        event_type: data.event_type as 'meeting' | 'task' | 'personal' | 'break'
+      };
+
+      setEvents([...events, newEventData]);
       setNewEvent({
         title: '',
         description: '',

@@ -1,10 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardData } from '@/hooks/useDashboardData';
-import { QuickStats } from '@/components/dashboard/QuickStats';
-import { ModuleGrid } from '@/components/dashboard/ModuleGrid';
-import { QuickActions } from '@/components/dashboard/QuickActions';
+import QuickStats from '@/components/dashboard/QuickStats';
+import ModuleGrid from '@/components/dashboard/ModuleGrid';
+import QuickActions from '@/components/dashboard/QuickActions';
 import TaskManager from './TaskManager';
 import ExpenseLogger from './ExpenseLogger';
 import MicroJournal from './MicroJournal';
@@ -14,25 +16,13 @@ import RelationshipCare from './RelationshipCare';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { 
-    totalTasks, 
-    completedTasks, 
-    totalFocusTime, 
-    totalExpenses, 
-    loading: statsLoading 
-  } = useDashboardData();
+  const { data, loading, refreshData } = useDashboardData();
   
   const [activeView, setActiveView] = useState<'dashboard' | 'tasks' | 'expenses' | 'journal' | 'planner' | 'relationship' | 'calendar'>('dashboard');
 
   useEffect(() => {
-    loadDashboardData();
+    refreshData();
   }, [user]);
-
-  const loadDashboardData = () => {
-    // This function is intentionally left empty as the useDashboardData hook handles the data loading.
-    // The purpose of this function is to trigger a re-fetch of the dashboard data when needed,
-    // for example, after a quick action is performed.
-  };
 
   if (activeView === 'tasks') {
     return <TaskManager onBack={() => setActiveView('dashboard')} />;
@@ -98,17 +88,11 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <QuickStats 
-            totalTasks={totalTasks}
-            completedTasks={completedTasks}
-            totalFocusTime={totalFocusTime}
-            totalExpenses={totalExpenses}
-            loading={statsLoading}
-          />
+          <QuickStats />
         </div>
 
         <ModuleGrid onModuleClick={setActiveView} />
-        <QuickActions onDataUpdated={loadDashboardData} />
+        <QuickActions onDataUpdated={refreshData} />
       </div>
     </div>
   );

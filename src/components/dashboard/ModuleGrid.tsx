@@ -4,10 +4,10 @@ import { Check, Brain, Heart, BookOpen, DollarSign, Bell } from 'lucide-react';
 import ModuleCard from './ModuleCard';
 
 interface ModuleGridProps {
-  setActiveModule: (module: string) => void;
+  onModuleClick: (module: string) => void;
 }
 
-const ModuleGrid = ({ setActiveModule }: ModuleGridProps) => {
+const ModuleGrid = ({ onModuleClick }: ModuleGridProps) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <ModuleCard
@@ -15,7 +15,7 @@ const ModuleGrid = ({ setActiveModule }: ModuleGridProps) => {
         title="Smart Task Manager"
         description="AI-prioritized tasks for maximum productivity"
         color="green"
-        onClick={() => setActiveModule('tasks')}
+        onClick={() => onModuleClick('tasks')}
         status="3 urgent tasks"
       />
       
@@ -24,7 +24,7 @@ const ModuleGrid = ({ setActiveModule }: ModuleGridProps) => {
         title="Daily Planner"
         description="AI-optimized schedule for your day"
         color="blue"
-        onClick={() => setActiveModule('planner')}
+        onClick={() => onModuleClick('planner')}
         status="Next: Team Meeting at 2 PM"
       />
       
@@ -33,7 +33,7 @@ const ModuleGrid = ({ setActiveModule }: ModuleGridProps) => {
         title="Relationship Care"
         description="Nurture your relationships with AI insights"
         color="pink"
-        onClick={() => setActiveModule('relationship')}
+        onClick={() => onModuleClick('relationship')}
         status="Send a sweet message today"
       />
       
@@ -42,7 +42,7 @@ const ModuleGrid = ({ setActiveModule }: ModuleGridProps) => {
         title="Micro Journal"
         description="Quick daily reflections with AI summaries"
         color="purple"
-        onClick={() => setActiveModule('journal')}
+        onClick={() => onModuleClick('journal')}
         status="Today's mood: Great!"
       />
       
@@ -51,7 +51,7 @@ const ModuleGrid = ({ setActiveModule }: ModuleGridProps) => {
         title="Expense Logger"
         description="Track spending with smart categorization"
         color="orange"
-        onClick={() => setActiveModule('expenses')}
+        onClick={() => onModuleClick('expenses')}
         status="₹340 spent today"
       />
       
@@ -60,7 +60,7 @@ const ModuleGrid = ({ setActiveModule }: ModuleGridProps) => {
         title="Smart Reminders"
         description="Never miss what matters most"
         color="indigo"
-        onClick={() => {}}
+        onClick={() => onModuleClick('calendar')}
         status="2 reminders set"
       />
     </div>
