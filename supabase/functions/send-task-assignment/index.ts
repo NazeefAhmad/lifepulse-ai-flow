@@ -41,7 +41,7 @@ const handler = async (req: Request): Promise<Response> => {
     const priorityEmoji = priority === 'high' ? '🔴' : priority === 'medium' ? '🟡' : '🟢';
 
     const emailResponse = await resend.emails.send({
-      from: "LifeSync <onboarding@resend.dev>",
+      from: "LifeSync <ella.ai@hoocup.fun>",
       to: [assignedToEmail],
       subject: `📋 New Task Assigned: ${taskTitle}`,
       html: `
