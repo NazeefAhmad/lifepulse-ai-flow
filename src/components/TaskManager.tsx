@@ -84,13 +84,8 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
 
   const sendTaskAssignmentEmail = async (taskData: any) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-task-assignment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('send-task-assignment', {
+        body: {
           taskTitle: taskData.title,
           taskDescription: taskData.description,
           assignedToEmail: taskData.assigned_to_email,
@@ -98,10 +93,10 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
           assignedByEmail: user?.email,
           dueDate: taskData.due_date,
           priority: taskData.priority
-        }),
+        }
       });
 
-      if (!response.ok) throw new Error('Failed to send email');
+      if (error) throw error;
       
       toast({
         title: "Task Assigned! 📧",
