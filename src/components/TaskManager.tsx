@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Filter, Search, Users, Mail, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Mail, Sparkles, Download, Upload, Bell } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
+import { useTaskNotifications } from '@/hooks/useTaskNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import TaskFilters from './TaskFilters';
 
 interface Task {
   id: string;
@@ -30,7 +32,8 @@ interface TaskManagerProps {
 const TaskManager = ({ onBack }: TaskManagerProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { isConnected, createTaskEvent } = useGoogleCalendar();
+  const { isConnected, createTaskEvent, importTasksFromCalendar, bulkExportTasks } = useGoogleCalendar();
+  const { preferences: notificationPrefs, updatePreferences } = useTaskNotifications();
   
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +47,11 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'in-progress' | 'completed'>('all');
   const [filterPriority, setFilterPriority] = useState<'all' | 'low' | 'medium' | 'high'>('all');
+  
+  // New filter state
+  const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [dueDateStart, setDueDateStart] = useState('');
+  const [dueDateEnd, setDueDateEnd] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -80,6 +88,58 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleImportFromCalendar = async () => {
+    try {
+      const importedTasks = await importTasksFromCalendar();
+      
+      if (importedTasks.length > 0) {
+        // Add imported tasks to database
+        const tasksToInsert = importedTasks.map(task => ({
+          ...task,
+          user_id: user?.id
+        }));
+
+        const { data, error } = await supabase
+          .from('tasks')
+          .insert(tasksToInsert)
+          .select();
+
+        if (error) throw error;
+
+        // Update local state
+        const newTasks: Task[] = (data || []).map(task => ({
+          ...task,
+          priority: task.priority as 'low' | 'medium' | 'high',
+          status: task.status as 'pending' | 'in-progress' | 'completed'
+        }));
+
+        setTasks([...newTasks, ...tasks]);
+      }
+    } catch (error) {
+      console.error('Error importing tasks:', error);
+      toast({
+        title: "Import Error",
+        description: "Failed to import tasks from Google Calendar.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleBulkExport = async () => {
+    const unSyncedTasks = tasks.filter(task => !task.google_event_id && task.status !== 'completed');
+    if (unSyncedTasks.length === 0) {
+      toast({
+        title: "No Tasks to Export",
+        description: "All tasks are already synced or completed.",
+      });
+      return;
+    }
+
+    await bulkExportTasks(unSyncedTasks);
+    // Refresh tasks to get updated google_event_ids
+    await loadTasks();
   };
 
   const sendTaskAssignmentEmail = async (taskData: any) => {
@@ -260,9 +320,35 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
                          task.assigned_to_name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || task.status === filterStatus;
     const matchesPriority = filterPriority === 'all' || task.priority === filterPriority;
+    const matchesAssignee = !assigneeFilter || 
+                           task.assigned_to_email?.toLowerCase().includes(assigneeFilter.toLowerCase()) ||
+                           task.assigned_to_name?.toLowerCase().includes(assigneeFilter.toLowerCase());
     
-    return matchesSearch && matchesStatus && matchesPriority;
+    let matchesDateRange = true;
+    if (dueDateStart || dueDateEnd) {
+      const taskDate = task.due_date ? new Date(task.due_date) : null;
+      if (taskDate) {
+        const startDate = dueDateStart ? new Date(dueDateStart) : null;
+        const endDate = dueDateEnd ? new Date(dueDateEnd) : null;
+        
+        if (startDate && taskDate < startDate) matchesDateRange = false;
+        if (endDate && taskDate > endDate) matchesDateRange = false;
+      } else {
+        matchesDateRange = false; // Exclude tasks without due dates when date filter is active
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesPriority && matchesAssignee && matchesDateRange;
   });
+
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setFilterStatus('all');
+    setFilterPriority('all');
+    setAssigneeFilter('');
+    setDueDateStart('');
+    setDueDateEnd('');
+  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -310,12 +396,44 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
           </div>
         </div>
         
-        {isConnected && (
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-4 py-2">
-            <Calendar className="h-3 w-3 mr-1" />
-            Google Calendar Connected
-          </Badge>
-        )}
+        <div className="flex items-center gap-3">
+          {isConnected && (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleImportFromCalendar}
+                className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Import from Calendar
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleBulkExport}
+                className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Export to Calendar
+              </Button>
+            </>
+          )}
+          
+          {notificationPrefs && (
+            <div className="flex items-center gap-2 bg-white/80 px-3 py-2 rounded-lg border border-purple-200">
+              <Bell className="h-4 w-4 text-purple-600" />
+              <span className="text-sm text-purple-700">
+                Reminders: {notificationPrefs.task_reminders_enabled ? 'On' : 'Off'}
+              </span>
+            </div>
+          )}
+          
+          {isConnected && (
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-4 py-2">
+              <Calendar className="h-3 w-3 mr-1" />
+              Calendar Connected
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Enhanced Add Task Card */}
@@ -422,50 +540,23 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
       </Card>
 
       {/* Enhanced Filter Section */}
-      <Card className="bg-white/80 backdrop-blur-sm shadow-lg border border-purple-100">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex items-center gap-2">
-              <Search className="h-4 w-4 text-purple-500" />
-              <Input
-                placeholder="Search tasks... 🔍"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-64 bg-white border-purple-200 focus:border-purple-400"
-              />
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-purple-500" />
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as any)}
-                className="px-3 py-2 border border-purple-200 rounded-md bg-white"
-              >
-                <option value="all">All Status</option>
-                <option value="pending">📋 Pending</option>
-                <option value="in-progress">⏳ In Progress</option>
-                <option value="completed">✅ Completed</option>
-              </select>
-              
-              <select
-                value={filterPriority}
-                onChange={(e) => setFilterPriority(e.target.value as any)}
-                className="px-3 py-2 border border-purple-200 rounded-md bg-white"
-              >
-                <option value="all">All Priority</option>
-                <option value="high">🔴 High</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="low">🟢 Low</option>
-              </select>
-            </div>
-            
-            <div className="text-sm text-purple-700 bg-purple-50 px-3 py-2 rounded-lg">
-              <strong>{filteredTasks.length}</strong> task{filteredTasks.length !== 1 ? 's' : ''} found
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <TaskFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        filterStatus={filterStatus}
+        onStatusChange={setFilterStatus}
+        filterPriority={filterPriority}
+        onPriorityChange={setFilterPriority}
+        assigneeFilter={assigneeFilter}
+        onAssigneeChange={setAssigneeFilter}
+        dueDateStart={dueDateStart}
+        onDueDateStartChange={setDueDateStart}
+        dueDateEnd={dueDateEnd}
+        onDueDateEndChange={setDueDateEnd}
+        filteredCount={filteredTasks.length}
+        totalCount={tasks.length}
+        onClearFilters={clearAllFilters}
+      />
 
       {/* Tasks List - keep existing structure but enhance styling */}
       {loading ? (

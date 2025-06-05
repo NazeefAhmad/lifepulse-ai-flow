@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -300,6 +299,126 @@ export const useGoogleCalendar = () => {
     }
   };
 
+  const importTasksFromCalendar = async (daysAhead = 7) => {
+    if (!isConnected || !accessToken) {
+      toast({
+        title: "Not Connected",
+        description: "Please connect to Google Calendar first.",
+        variant: "destructive",
+      });
+      return [];
+    }
+
+    try {
+      const timeMin = new Date().toISOString();
+      const timeMax = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString();
+
+      const response = await window.gapi.client.request({
+        path: `https://www.googleapis.com/calendar/v3/calendars/primary/events`,
+        method: 'GET',
+        params: {
+          timeMin,
+          timeMax,
+          maxResults: 50,
+          singleEvents: true,
+          orderBy: 'startTime',
+          q: '#task', // Look for events with #task hashtag
+        },
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      const events = response.result.items || [];
+      
+      // Filter events that contain #task and convert to task format
+      const taskEvents = events.filter((event: any) => 
+        event.summary?.includes('#task') || event.description?.includes('#task')
+      );
+
+      const importedTasks = taskEvents.map((event: any) => ({
+        title: event.summary?.replace('#task', '').trim() || 'Imported Task',
+        description: event.description?.replace('#task', '').trim() || '',
+        due_date: event.start?.date || event.start?.dateTime?.split('T')[0],
+        priority: event.description?.includes('high') ? 'high' : 
+                 event.description?.includes('low') ? 'low' : 'medium',
+        google_event_id: event.id,
+        status: 'pending'
+      }));
+
+      toast({
+        title: "Tasks Imported",
+        description: `Found ${importedTasks.length} task(s) from Google Calendar.`,
+      });
+
+      return importedTasks;
+    } catch (error) {
+      console.error('Error importing tasks from calendar:', error);
+      toast({
+        title: "Import Failed",
+        description: "Failed to import tasks from Google Calendar.",
+        variant: "destructive",
+      });
+      return [];
+    }
+  };
+
+  const bulkExportTasks = async (tasks: any[]) => {
+    if (!isConnected || !accessToken || tasks.length === 0) {
+      toast({
+        title: "Cannot Export",
+        description: "Please connect to Google Calendar and select tasks to export.",
+        variant: "destructive",
+      });
+      return [];
+    }
+
+    try {
+      const exportPromises = tasks.map(async (task) => {
+        if (task.google_event_id) return null; // Skip already synced tasks
+
+        const startDateTime = task.due_date ? 
+          new Date(`${task.due_date}T09:00:00`) : 
+          new Date(Date.now() + 24 * 60 * 60 * 1000); // Tomorrow if no due date
+        
+        const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // 1 hour duration
+
+        const event = {
+          summary: `📋 ${task.title} #task`,
+          description: `${task.description || ''}\n\nPriority: ${task.priority}\nStatus: ${task.status}\n\nCreated by LifeSync`,
+          start: {
+            dateTime: startDateTime.toISOString(),
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          },
+          end: {
+            dateTime: endDateTime.toISOString(),
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          }
+        };
+
+        return await createCalendarEvent(event);
+      });
+
+      const results = await Promise.all(exportPromises);
+      const successCount = results.filter(result => result !== null).length;
+
+      toast({
+        title: "Bulk Export Complete",
+        description: `Successfully exported ${successCount} of ${tasks.length} tasks to Google Calendar.`,
+      });
+
+      return results;
+    } catch (error) {
+      console.error('Error bulk exporting tasks:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export tasks to Google Calendar.",
+        variant: "destructive",
+      });
+      return [];
+    }
+  };
+
   return {
     isConnected,
     loading,
@@ -310,6 +429,8 @@ export const useGoogleCalendar = () => {
     createTaskEvent,
     createReminderEvent,
     createDailyPlannerEvent,
-    getUpcomingEvents
+    getUpcomingEvents,
+    importTasksFromCalendar,
+    bulkExportTasks
   };
 };

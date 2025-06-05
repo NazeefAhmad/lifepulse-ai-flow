@@ -132,6 +132,36 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          reminder_days_before: number
+          reminder_hours_before: number
+          task_reminders_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reminder_days_before?: number
+          reminder_hours_before?: number
+          task_reminders_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reminder_days_before?: number
+          reminder_hours_before?: number
+          task_reminders_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -204,6 +234,41 @@ export type Database = {
         }
         Relationships: []
       }
+      task_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          notification_type: string
+          sent_at: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notification_type: string
+          sent_at?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notification_type?: string
+          sent_at?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_notifications_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assigned_to_email: string | null
@@ -254,7 +319,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_tasks_needing_reminders: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          task_id: string
+          user_id: string
+          title: string
+          due_date: string
+          assigned_to_email: string
+          days_until_due: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
