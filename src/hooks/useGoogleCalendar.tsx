@@ -28,12 +28,85 @@ export const useGoogleCalendar = () => {
   const [loading, setLoading] = useState(false);
   const [credentialsSet, setCredentialsSet] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [tokenExpiry, setTokenExpiry] = useState<number | null>(null);
   const { toast } = useToast();
+
+  // Load saved token on mount
+  useEffect(() => {
+    const savedToken = localStorage.getItem('google_calendar_token');
+    const savedExpiry = localStorage.getItem('google_calendar_token_expiry');
+    
+    if (savedToken && savedExpiry) {
+      const expiryTime = parseInt(savedExpiry);
+      if (Date.now() < expiryTime) {
+        setAccessToken(savedToken);
+        setTokenExpiry(expiryTime);
+        setIsConnected(true);
+      } else {
+        // Token expired, clear it
+        localStorage.removeItem('google_calendar_token');
+        localStorage.removeItem('google_calendar_token_expiry');
+      }
+    }
+  }, []);
+
+  // Auto-refresh token before expiry
+  useEffect(() => {
+    if (tokenExpiry && accessToken) {
+      const timeUntilExpiry = tokenExpiry - Date.now();
+      const refreshTime = Math.max(0, timeUntilExpiry - 300000); // Refresh 5 mins before expiry
+      
+      const refreshTimer = setTimeout(() => {
+        refreshAccessToken();
+      }, refreshTime);
+
+      return () => clearTimeout(refreshTimer);
+    }
+  }, [tokenExpiry, accessToken]);
+
+  const saveToken = (token: string, expiresIn: number) => {
+    const expiryTime = Date.now() + (expiresIn * 1000);
+    localStorage.setItem('google_calendar_token', token);
+    localStorage.setItem('google_calendar_token_expiry', expiryTime.toString());
+    setAccessToken(token);
+    setTokenExpiry(expiryTime);
+    setIsConnected(true);
+  };
+
+  const clearToken = () => {
+    localStorage.removeItem('google_calendar_token');
+    localStorage.removeItem('google_calendar_token_expiry');
+    setAccessToken(null);
+    setTokenExpiry(null);
+    setIsConnected(false);
+  };
+
+  const refreshAccessToken = async () => {
+    try {
+      if (window.google?.accounts?.oauth2) {
+        const { data: credentials } = await supabase.functions.invoke('get-google-credentials');
+        
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+          client_id: credentials.clientId,
+          scope: 'https://www.googleapis.com/auth/calendar',
+          callback: (response: any) => {
+            if (response.access_token) {
+              saveToken(response.access_token, response.expires_in || 3600);
+            }
+          },
+        });
+        
+        tokenClient.requestAccessToken({ prompt: '' }); // Silent refresh
+      }
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      clearToken();
+    }
+  };
 
   const initializeGapi = useCallback(async () => {
     if (typeof window !== 'undefined' && window.gapi) {
       try {
-        // Get credentials from Supabase edge function
         const { data: credentials, error } = await supabase.functions.invoke('get-google-credentials');
         
         if (error || !credentials?.credentialsSet) {
@@ -42,31 +115,12 @@ export const useGoogleCalendar = () => {
           return;
         }
 
-        // Initialize Google API client
         await new Promise((resolve) => window.gapi.load('client', resolve));
         
         await window.gapi.client.init({
           apiKey: credentials.apiKey,
           discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
         });
-
-        // Initialize Google Identity Services
-        if (window.google?.accounts?.oauth2) {
-          window.google.accounts.oauth2.initTokenClient({
-            client_id: credentials.clientId,
-            scope: 'https://www.googleapis.com/auth/calendar',
-            callback: (response: any) => {
-              if (response.access_token) {
-                setAccessToken(response.access_token);
-                setIsConnected(true);
-                toast({
-                  title: "Google Calendar Connected",
-                  description: "Successfully connected to your Google Calendar.",
-                });
-              }
-            },
-          });
-        }
 
         setCredentialsSet(true);
       } catch (error) {
@@ -82,12 +136,10 @@ export const useGoogleCalendar = () => {
 
   useEffect(() => {
     const loadGoogleServices = () => {
-      // Load Google API
       if (!window.gapi) {
         const gapiScript = document.createElement('script');
         gapiScript.src = 'https://apis.google.com/js/api.js';
         gapiScript.onload = () => {
-          // Load Google Identity Services
           const gisScript = document.createElement('script');
           gisScript.src = 'https://accounts.google.com/gsi/client';
           gisScript.onload = initializeGapi;
@@ -122,8 +174,7 @@ export const useGoogleCalendar = () => {
           scope: 'https://www.googleapis.com/auth/calendar',
           callback: (response: any) => {
             if (response.access_token) {
-              setAccessToken(response.access_token);
-              setIsConnected(true);
+              saveToken(response.access_token, response.expires_in || 3600);
               toast({
                 title: "Google Calendar Connected",
                 description: "Successfully connected to your Google Calendar.",
@@ -151,8 +202,7 @@ export const useGoogleCalendar = () => {
       if (accessToken && window.google?.accounts?.oauth2) {
         window.google.accounts.oauth2.revoke(accessToken);
       }
-      setAccessToken(null);
-      setIsConnected(false);
+      clearToken();
       
       toast({
         title: "Disconnected",
@@ -173,6 +223,11 @@ export const useGoogleCalendar = () => {
       return null;
     }
 
+    // Check if token is about to expire and refresh if needed
+    if (tokenExpiry && Date.now() > tokenExpiry - 300000) {
+      await refreshAccessToken();
+    }
+
     try {
       const response = await window.gapi.client.request({
         path: `https://www.googleapis.com/calendar/v3/calendars/primary/events`,
@@ -191,6 +246,13 @@ export const useGoogleCalendar = () => {
       return response.result;
     } catch (error) {
       console.error('Error creating calendar event:', error);
+      
+      // If unauthorized, try to refresh token
+      if (error.status === 401) {
+        await refreshAccessToken();
+        return createCalendarEvent(event); // Retry once
+      }
+      
       toast({
         title: "Event Creation Failed",
         description: "Failed to create calendar event. Please try again.",
@@ -322,7 +384,7 @@ export const useGoogleCalendar = () => {
           maxResults: 50,
           singleEvents: true,
           orderBy: 'startTime',
-          q: '#task', // Look for events with #task hashtag
+          q: '#task',
         },
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -331,7 +393,6 @@ export const useGoogleCalendar = () => {
 
       const events = response.result.items || [];
       
-      // Filter events that contain #task and convert to task format
       const taskEvents = events.filter((event: any) => 
         event.summary?.includes('#task') || event.description?.includes('#task')
       );
@@ -375,13 +436,13 @@ export const useGoogleCalendar = () => {
 
     try {
       const exportPromises = tasks.map(async (task) => {
-        if (task.google_event_id) return null; // Skip already synced tasks
+        if (task.google_event_id) return null;
 
         const startDateTime = task.due_date ? 
           new Date(`${task.due_date}T09:00:00`) : 
-          new Date(Date.now() + 24 * 60 * 60 * 1000); // Tomorrow if no due date
+          new Date(Date.now() + 24 * 60 * 60 * 1000);
         
-        const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // 1 hour duration
+        const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000);
 
         const event = {
           summary: `📋 ${task.title} #task`,
