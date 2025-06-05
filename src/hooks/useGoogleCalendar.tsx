@@ -1,6 +1,6 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CalendarEvent {
   summary: string;
@@ -33,19 +33,18 @@ export const useGoogleCalendar = () => {
       try {
         await new Promise((resolve) => window.gapi.load('auth2:client', resolve));
         
-        // Get credentials from environment or show setup message
-        const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
-        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        // Get credentials from Supabase edge function
+        const { data: credentials, error } = await supabase.functions.invoke('get-google-credentials');
         
-        if (!apiKey || !clientId) {
+        if (error || !credentials?.credentialsSet) {
           console.log('Google API credentials not configured');
           setCredentialsSet(false);
           return;
         }
         
         await window.gapi.client.init({
-          apiKey: apiKey,
-          clientId: clientId,
+          apiKey: credentials.apiKey,
+          clientId: credentials.clientId,
           discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
           scope: 'https://www.googleapis.com/auth/calendar'
         });
@@ -60,8 +59,8 @@ export const useGoogleCalendar = () => {
       } catch (error) {
         console.error('Error initializing Google API:', error);
         toast({
-          title: "Google Calendar Setup Required",
-          description: "Please configure your Google API credentials in the project settings.",
+          title: "Google Calendar Setup Error",
+          description: "Failed to initialize Google Calendar integration.",
           variant: "destructive",
         });
       }
