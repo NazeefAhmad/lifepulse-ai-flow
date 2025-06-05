@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,6 +20,7 @@ interface CalendarEvent {
 declare global {
   interface Window {
     gapi: any;
+    google: any;
   }
 }
 
@@ -26,13 +28,12 @@ export const useGoogleCalendar = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [credentialsSet, setCredentialsSet] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const { toast } = useToast();
 
   const initializeGapi = useCallback(async () => {
     if (typeof window !== 'undefined' && window.gapi) {
       try {
-        await new Promise((resolve) => window.gapi.load('auth2:client', resolve));
-        
         // Get credentials from Supabase edge function
         const { data: credentials, error } = await supabase.functions.invoke('get-google-credentials');
         
@@ -41,21 +42,34 @@ export const useGoogleCalendar = () => {
           setCredentialsSet(false);
           return;
         }
+
+        // Initialize Google API client
+        await new Promise((resolve) => window.gapi.load('client', resolve));
         
         await window.gapi.client.init({
           apiKey: credentials.apiKey,
-          clientId: credentials.clientId,
           discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
-          scope: 'https://www.googleapis.com/auth/calendar'
         });
 
-        setCredentialsSet(true);
-        const authInstance = window.gapi.auth2.getAuthInstance();
-        const isSignedIn = authInstance.isSignedIn.get();
-        setIsConnected(isSignedIn);
+        // Initialize Google Identity Services
+        if (window.google?.accounts?.oauth2) {
+          window.google.accounts.oauth2.initTokenClient({
+            client_id: credentials.clientId,
+            scope: 'https://www.googleapis.com/auth/calendar',
+            callback: (response: any) => {
+              if (response.access_token) {
+                setAccessToken(response.access_token);
+                setIsConnected(true);
+                toast({
+                  title: "Google Calendar Connected",
+                  description: "Successfully connected to your Google Calendar.",
+                });
+              }
+            },
+          });
+        }
 
-        // Listen for sign-in state changes
-        authInstance.isSignedIn.listen(setIsConnected);
+        setCredentialsSet(true);
       } catch (error) {
         console.error('Error initializing Google API:', error);
         toast({
@@ -68,18 +82,25 @@ export const useGoogleCalendar = () => {
   }, [toast]);
 
   useEffect(() => {
-    const loadGapi = () => {
+    const loadGoogleServices = () => {
+      // Load Google API
       if (!window.gapi) {
-        const script = document.createElement('script');
-        script.src = 'https://apis.google.com/js/api.js';
-        script.onload = initializeGapi;
-        document.head.appendChild(script);
+        const gapiScript = document.createElement('script');
+        gapiScript.src = 'https://apis.google.com/js/api.js';
+        gapiScript.onload = () => {
+          // Load Google Identity Services
+          const gisScript = document.createElement('script');
+          gisScript.src = 'https://accounts.google.com/gsi/client';
+          gisScript.onload = initializeGapi;
+          document.head.appendChild(gisScript);
+        };
+        document.head.appendChild(gapiScript);
       } else {
         initializeGapi();
       }
     };
 
-    loadGapi();
+    loadGoogleServices();
   }, [initializeGapi]);
 
   const signInToGoogle = async () => {
@@ -94,34 +115,44 @@ export const useGoogleCalendar = () => {
 
     setLoading(true);
     try {
-      if (!window.gapi?.auth2) {
-        await initializeGapi();
+      const { data: credentials } = await supabase.functions.invoke('get-google-credentials');
+      
+      if (window.google?.accounts?.oauth2) {
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+          client_id: credentials.clientId,
+          scope: 'https://www.googleapis.com/auth/calendar',
+          callback: (response: any) => {
+            if (response.access_token) {
+              setAccessToken(response.access_token);
+              setIsConnected(true);
+              toast({
+                title: "Google Calendar Connected",
+                description: "Successfully connected to your Google Calendar.",
+              });
+            }
+            setLoading(false);
+          },
+        });
+        
+        tokenClient.requestAccessToken();
       }
-      
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      await authInstance.signIn();
-      setIsConnected(true);
-      
-      toast({
-        title: "Google Calendar Connected",
-        description: "Successfully connected to your Google Calendar.",
-      });
     } catch (error) {
       console.error('Error signing in to Google:', error);
       toast({
         title: "Connection Failed",
-        description: "Failed to connect to Google Calendar. Please check your setup.",
+        description: "Failed to connect to Google Calendar. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
 
   const signOutFromGoogle = async () => {
     try {
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      await authInstance.signOut();
+      if (accessToken && window.google?.accounts?.oauth2) {
+        window.google.accounts.oauth2.revoke(accessToken);
+      }
+      setAccessToken(null);
       setIsConnected(false);
       
       toast({
@@ -134,7 +165,7 @@ export const useGoogleCalendar = () => {
   };
 
   const createCalendarEvent = async (event: CalendarEvent) => {
-    if (!isConnected) {
+    if (!isConnected || !accessToken) {
       toast({
         title: "Not Connected",
         description: "Please connect to Google Calendar first.",
@@ -148,6 +179,9 @@ export const useGoogleCalendar = () => {
         path: `https://www.googleapis.com/calendar/v3/calendars/primary/events`,
         method: 'POST',
         body: event,
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
       });
 
       toast({
@@ -242,7 +276,7 @@ export const useGoogleCalendar = () => {
   };
 
   const getUpcomingEvents = async (maxResults = 10) => {
-    if (!isConnected) return [];
+    if (!isConnected || !accessToken) return [];
 
     try {
       const response = await window.gapi.client.request({
@@ -253,6 +287,9 @@ export const useGoogleCalendar = () => {
           maxResults: maxResults,
           singleEvents: true,
           orderBy: 'startTime',
+        },
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
         },
       });
 
