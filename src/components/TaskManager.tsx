@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Mail, Sparkles, Download, Upload, Bell } from 'lucide-react';
+import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Mail, Sparkles, Download, Upload, Bell, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -544,9 +544,9 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         filterStatus={filterStatus}
-        onStatusChange={setFilterStatus}
+        onStatusChange={(value) => setFilterStatus(value as 'all' | 'pending' | 'in-progress' | 'completed')}
         filterPriority={filterPriority}
-        onPriorityChange={setFilterPriority}
+        onPriorityChange={(value) => setFilterPriority(value as 'all' | 'low' | 'medium' | 'high')}
         assigneeFilter={assigneeFilter}
         onAssigneeChange={setAssigneeFilter}
         dueDateStart={dueDateStart}
