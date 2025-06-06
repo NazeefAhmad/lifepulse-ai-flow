@@ -1,6 +1,8 @@
+
 import React from 'react';
-import { CheckSquare, DollarSign, BookOpen, Calendar, Heart, TrendingUp, Timer } from 'lucide-react';
+import { CheckSquare, DollarSign, BookOpen, Calendar, Heart, Timer, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface ModuleGridProps {
   onModuleClick: (module: string) => void;
@@ -9,22 +11,26 @@ interface ModuleGridProps {
 const ModuleGrid = ({ onModuleClick }: ModuleGridProps) => {
   const modules = [
     {
-      id: 'tasks',
-      title: 'Smart Tasks',
-      description: 'AI-powered task management with assignment capabilities',
-      icon: CheckSquare,
-      color: 'from-blue-500 to-blue-600',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-200'
-    },
-    {
       id: 'focus',
       title: 'Focus Mode',
-      description: 'Pomodoro timer with productivity tracking',
+      description: 'Pomodoro timer with analytics & insights',
       icon: Timer,
       color: 'from-purple-500 to-purple-600',
-      bgColor: 'bg-purple-50',
-      borderColor: 'border-purple-200'
+      bgColor: 'bg-gradient-to-br from-purple-50 to-purple-100',
+      borderColor: 'border-purple-200',
+      badge: 'Enhanced',
+      badgeColor: 'bg-purple-600'
+    },
+    {
+      id: 'tasks',
+      title: 'Smart Tasks',
+      description: 'AI-powered task management with assignments',
+      icon: CheckSquare,
+      color: 'from-blue-500 to-blue-600',
+      bgColor: 'bg-gradient-to-br from-blue-50 to-blue-100',
+      borderColor: 'border-blue-200',
+      badge: 'Popular',
+      badgeColor: 'bg-blue-600'
     },
     {
       id: 'expenses',
@@ -32,17 +38,10 @@ const ModuleGrid = ({ onModuleClick }: ModuleGridProps) => {
       description: 'Track spending with intelligent categorization',
       icon: DollarSign,
       color: 'from-green-500 to-green-600',
-      bgColor: 'bg-green-50',
-      borderColor: 'border-green-200'
-    },
-    {
-      id: 'analytics',
-      title: 'Analytics & Insights',
-      description: 'Visual reports and productivity analytics',
-      icon: TrendingUp,
-      color: 'from-indigo-500 to-indigo-600',
-      bgColor: 'bg-indigo-50',
-      borderColor: 'border-indigo-200'
+      bgColor: 'bg-gradient-to-br from-green-50 to-green-100',
+      borderColor: 'border-green-200',
+      badge: 'Auto-Sort',
+      badgeColor: 'bg-green-600'
     },
     {
       id: 'journal',
@@ -50,8 +49,10 @@ const ModuleGrid = ({ onModuleClick }: ModuleGridProps) => {
       description: 'Quick thoughts and daily reflections',
       icon: BookOpen,
       color: 'from-orange-500 to-orange-600',
-      bgColor: 'bg-orange-50',
-      borderColor: 'border-orange-200'
+      bgColor: 'bg-gradient-to-br from-orange-50 to-orange-100',
+      borderColor: 'border-orange-200',
+      badge: 'Daily',
+      badgeColor: 'bg-orange-600'
     },
     {
       id: 'planner',
@@ -59,8 +60,10 @@ const ModuleGrid = ({ onModuleClick }: ModuleGridProps) => {
       description: 'Organize your day with time blocks',
       icon: Calendar,
       color: 'from-pink-500 to-pink-600',
-      bgColor: 'bg-pink-50',
-      borderColor: 'border-pink-200'
+      bgColor: 'bg-gradient-to-br from-pink-50 to-pink-100',
+      borderColor: 'border-pink-200',
+      badge: 'Scheduler',
+      badgeColor: 'bg-pink-600'
     },
     {
       id: 'relationship',
@@ -68,30 +71,55 @@ const ModuleGrid = ({ onModuleClick }: ModuleGridProps) => {
       description: 'Strengthen bonds with AI-generated messages',
       icon: Heart,
       color: 'from-red-500 to-red-600',
-      bgColor: 'bg-red-50',
-      borderColor: 'border-red-200'
+      bgColor: 'bg-gradient-to-br from-red-50 to-red-100',
+      borderColor: 'border-red-200',
+      badge: 'AI-Powered',
+      badgeColor: 'bg-red-600'
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {modules.map((module) => (
-        <Card
-          key={module.id}
-          className={`transition-all transform hover:scale-105 cursor-pointer ${module.bgColor} ${module.borderColor} border-2 shadow-md`}
-          onClick={() => onModuleClick(module.id)}
-        >
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className={`text-4xl font-bold bg-gradient-to-r ${module.color} bg-clip-text text-transparent`}>
-                <module.icon className="h-8 w-8" />
-              </div>
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent mb-2">
+          Your Life Modules
+        </h2>
+        <p className="text-gray-600 text-lg">Choose what you want to work on today</p>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {modules.map((module) => (
+          <Card
+            key={module.id}
+            className={`group relative transition-all duration-300 transform hover:scale-105 hover:shadow-2xl cursor-pointer ${module.bgColor} ${module.borderColor} border-2 shadow-lg overflow-hidden`}
+            onClick={() => onModuleClick(module.id)}
+          >
+            <div className="absolute top-3 right-3">
+              <Badge className={`text-white text-xs ${module.badgeColor}`}>
+                {module.badge}
+              </Badge>
             </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">{module.title}</h3>
-            <p className="text-gray-600">{module.description}</p>
-          </CardContent>
-        </Card>
-      ))}
+            
+            <CardContent className="p-6 relative">
+              <div className="flex items-start justify-between mb-4">
+                <div className={`p-3 rounded-xl bg-white/50 backdrop-blur-sm shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                  <module.icon className="h-8 w-8 text-gray-700" />
+                </div>
+                <Sparkles className="h-4 w-4 text-gray-400 group-hover:text-yellow-500 transition-colors duration-300" />
+              </div>
+              
+              <h3 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-gray-900 transition-colors">
+                {module.title}
+              </h3>
+              <p className="text-gray-600 text-sm leading-relaxed group-hover:text-gray-700 transition-colors">
+                {module.description}
+              </p>
+              
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/30 to-transparent group-hover:via-white/60 transition-all duration-300"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 };
