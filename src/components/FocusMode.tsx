@@ -36,7 +36,6 @@ const FocusMode = ({ onBack }: FocusModeProps) => {
   const [recentSessions, setRecentSessions] = useState<FocusSession[]>([]);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const FOCUS_DURATION = customDuration * 60;
   const SHORT_BREAK = 5 * 60;
@@ -90,6 +89,7 @@ const FocusMode = ({ onBack }: FocusModeProps) => {
   const loadRecentSessions = async () => {
     if (!user) return;
     
+    // First, check if the focus_sessions table has the required columns
     const { data } = await supabase
       .from('focus_sessions')
       .select('*')
@@ -98,7 +98,16 @@ const FocusMode = ({ onBack }: FocusModeProps) => {
       .order('created_at', { ascending: false })
       .limit(5);
     
-    setRecentSessions(data || []);
+    // Transform the data to match our FocusSession interface
+    const transformedSessions: FocusSession[] = (data || []).map(session => ({
+      id: session.id,
+      task_title: 'General Focus', // Default value since it's not in the database yet
+      duration_minutes: session.duration_minutes,
+      completed: true, // Default to true since these are logged sessions
+      date: session.date
+    }));
+    
+    setRecentSessions(transformedSessions);
   };
 
   const loadTodaysFocusTime = async () => {
@@ -152,9 +161,7 @@ const FocusMode = ({ onBack }: FocusModeProps) => {
       const sessionData = {
         user_id: user.id,
         duration_minutes: customDuration,
-        date: new Date().toISOString().split('T')[0],
-        task_title: selectedTask || 'General Focus',
-        completed: true
+        date: new Date().toISOString().split('T')[0]
       };
 
       const { error } = await supabase
@@ -182,18 +189,22 @@ const FocusMode = ({ onBack }: FocusModeProps) => {
 
   const playNotificationSound = () => {
     // Create a simple beep sound
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.5);
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (error) {
+      console.log('Audio notification not available');
+    }
   };
 
   const startTimer = () => {
@@ -401,7 +412,7 @@ const FocusMode = ({ onBack }: FocusModeProps) => {
                 <div className="space-y-2">
                   {recentSessions.length > 0 ? (
                     recentSessions.map((session, index) => (
-                      <div key={index} className="flex justify-between items-center p-2 bg-purple-50 rounded">
+                      <div key={session.id || index} className="flex justify-between items-center p-2 bg-purple-50 rounded">
                         <div className="text-sm">
                           <div className="font-medium">{session.task_title}</div>
                           <div className="text-gray-500">{session.duration_minutes} min</div>
