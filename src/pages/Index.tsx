@@ -1,11 +1,7 @@
 
 import React, { useState } from 'react';
-import { Plus, Brain, Heart, BookOpen, DollarSign, Bell, Check, Clock, TrendingUp } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
+import { PomodoroProvider } from '@/contexts/PomodoroContext';
 import TaskManager from '@/components/TaskManager';
 import DailyPlanner from '@/components/DailyPlanner';
 import MicroJournal from '@/components/MicroJournal';
@@ -14,6 +10,7 @@ import RelationshipCare from '@/components/RelationshipCare';
 import AuthPage from '@/components/AuthPage';
 import Dashboard from '@/components/Dashboard';
 import Navigation from '@/components/Navigation';
+import FloatingPomodoroWidget from '@/components/FloatingPomodoroWidget';
 
 const AppContent = () => {
   const { user, loading } = useAuth();
@@ -54,16 +51,21 @@ const AppContent = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navigation 
-        activeModule={activeModule} 
-        setActiveModule={setActiveModule}
-      />
-      
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {renderActiveModule()}
-      </main>
-    </div>
+    <PomodoroProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Navigation 
+          activeModule={activeModule} 
+          setActiveModule={setActiveModule}
+        />
+        
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {renderActiveModule()}
+        </main>
+
+        {/* Floating Pomodoro Widget */}
+        <FloatingPomodoroWidget />
+      </div>
+    </PomodoroProvider>
   );
 };
 
