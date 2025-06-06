@@ -7,6 +7,8 @@ import { useDashboardData } from '@/hooks/useDashboardData';
 import QuickStats from '@/components/dashboard/QuickStats';
 import ModuleGrid from '@/components/dashboard/ModuleGrid';
 import QuickActions from '@/components/dashboard/QuickActions';
+import MoodCheckIn from '@/components/MoodCheckIn';
+import CompactCalendarConnect from '@/components/CompactCalendarConnect';
 import TaskManager from './TaskManager';
 import ExpenseLogger from './ExpenseLogger';
 import MicroJournal from './MicroJournal';
@@ -26,6 +28,10 @@ const Dashboard = () => {
 
   const handleModuleClick = (module: string) => {
     setActiveView(module as 'dashboard' | 'tasks' | 'expenses' | 'journal' | 'planner' | 'relationship' | 'calendar');
+  };
+
+  const handleCalendarClick = () => {
+    setActiveView('calendar');
   };
 
   if (activeView === 'tasks') {
@@ -89,6 +95,22 @@ const Dashboard = () => {
                   minute: '2-digit'
                 })}
               </p>
+            </div>
+          </div>
+
+          {/* Enhanced Top Section with Mood Check-in and Calendar */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+            <div className="lg:col-span-2">
+              <MoodCheckIn onMoodUpdated={refreshData} />
+            </div>
+            <div className="lg:col-span-1">
+              <CompactCalendarConnect onCalendarClick={handleCalendarClick} />
+            </div>
+            <div className="lg:col-span-1 flex items-center justify-center">
+              <div className="text-center p-4 bg-white rounded-lg border shadow-sm">
+                <div className="text-2xl font-bold text-indigo-600">{new Date().getDate()}</div>
+                <div className="text-sm text-gray-500">{new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
+              </div>
             </div>
           </div>
 
