@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,19 +14,21 @@ import MicroJournal from './MicroJournal';
 import GoogleCalendarIntegration from './GoogleCalendarIntegration';
 import DailyPlannerManager from './DailyPlannerManager';
 import RelationshipCare from './RelationshipCare';
+import FocusMode from './FocusMode';
+import AnalyticsInsights from './AnalyticsInsights';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const { data, loading, refreshData } = useDashboardData();
   
-  const [activeView, setActiveView] = useState<'dashboard' | 'tasks' | 'expenses' | 'journal' | 'planner' | 'relationship' | 'calendar'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'tasks' | 'expenses' | 'journal' | 'planner' | 'relationship' | 'calendar' | 'focus' | 'analytics'>('dashboard');
 
   useEffect(() => {
     refreshData();
   }, [user]);
 
   const handleModuleClick = (module: string) => {
-    setActiveView(module as 'dashboard' | 'tasks' | 'expenses' | 'journal' | 'planner' | 'relationship' | 'calendar');
+    setActiveView(module as 'dashboard' | 'tasks' | 'expenses' | 'journal' | 'planner' | 'relationship' | 'calendar' | 'focus' | 'analytics');
   };
 
   const handleCalendarClick = () => {
@@ -69,6 +70,14 @@ const Dashboard = () => {
     );
   }
 
+  if (activeView === 'focus') {
+    return <FocusMode onBack={() => setActiveView('dashboard')} />;
+  }
+
+  if (activeView === 'analytics') {
+    return <AnalyticsInsights onBack={() => setActiveView('dashboard')} />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       <div className="container mx-auto px-4 py-8">
@@ -100,13 +109,11 @@ const Dashboard = () => {
 
           {/* Enhanced Top Section with Mood Check-in and Calendar */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-3">
               <MoodCheckIn onMoodUpdated={refreshData} />
             </div>
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 flex flex-col gap-4">
               <CompactCalendarConnect onCalendarClick={handleCalendarClick} />
-            </div>
-            <div className="lg:col-span-1 flex items-center justify-center">
               <div className="text-center p-4 bg-white rounded-lg border shadow-sm">
                 <div className="text-2xl font-bold text-indigo-600">{new Date().getDate()}</div>
                 <div className="text-sm text-gray-500">{new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
