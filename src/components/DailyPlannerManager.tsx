@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Clock, MapPin, Calendar, Trash2, Edit3 } from 'lucide-react';
+import { ArrowLeft, Plus, Clock, MapPin, Calendar, Trash2, Edit3, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import TypingIndicator from './TypingIndicator';
 
 interface DailyEvent {
   id: string;
@@ -44,6 +45,7 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
     event_type: 'task' as 'meeting' | 'task' | 'personal' | 'break',
     syncToGoogle: false
   });
+  const [isTyping, setIsTyping] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -83,55 +85,102 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
     }
   };
 
-  const addEvent = async () => {
+  const splitEventsFromText = (text: string): string[] => {
+    // Split by common delimiters that indicate separate events
+    const delimiters = ['\n', ';', ',', '|', '•', '-', '*'];
+    let events = [text];
+    
+    delimiters.forEach(delimiter => {
+      events = events.flatMap(event => 
+        event.split(delimiter).map(e => e.trim()).filter(e => e.length > 0)
+      );
+    });
+    
+    // Filter out very short events (likely not meaningful)
+    return events.filter(event => event.length > 2);
+  };
+
+  const handleEventInput = (value: string) => {
+    setNewEvent({ ...newEvent, title: value });
+    
+    // Show typing indicator
+    setIsTyping(true);
+    setTimeout(() => setIsTyping(false), 1000);
+    
+    // Check if input contains multiple events
+    const potentialEvents = splitEventsFromText(value);
+    if (potentialEvents.length > 1) {
+      console.log(`Will create ${potentialEvents.length} events:`, potentialEvents);
+    }
+  };
+
+  const addBulkEvents = async () => {
     if (!newEvent.title.trim() || !newEvent.start_time || !user) return;
     
     try {
       setLoading(true);
       
-      let googleEventId = null;
+      const eventsToCreate = splitEventsFromText(newEvent.title);
+      console.log('Creating bulk events:', eventsToCreate);
       
-      // Create Google Calendar event if sync is enabled
-      if (newEvent.syncToGoogle && isConnected) {
-        const googleEvent = await createDailyPlannerEvent({
-          title: newEvent.title,
-          description: newEvent.description,
-          startTime: newEvent.start_time,
-          duration: newEvent.duration_minutes,
-          date: selectedDate,
-          location: newEvent.location
+      if (eventsToCreate.length > 1) {
+        toast({
+          title: `Creating ${eventsToCreate.length} events...`,
+          description: "Processing your bulk event creation",
         });
+      }
+      
+      const createdEvents = [];
+      let hasGoogleSync = false;
+      
+      for (const eventTitle of eventsToCreate) {
+        let googleEventId = null;
         
-        if (googleEvent) {
-          googleEventId = googleEvent.id;
+        // Create Google Calendar event if sync is enabled
+        if (newEvent.syncToGoogle && isConnected) {
+          const googleEvent = await createDailyPlannerEvent({
+            title: eventTitle,
+            description: newEvent.description,
+            startTime: newEvent.start_time,
+            duration: newEvent.duration_minutes,
+            date: selectedDate,
+            location: newEvent.location
+          });
+          
+          if (googleEvent) {
+            googleEventId = googleEvent.id;
+            hasGoogleSync = true;
+          }
         }
+
+        const { data, error } = await supabase
+          .from('daily_events')
+          .insert([{
+            user_id: user.id,
+            title: eventTitle,
+            description: newEvent.description || null,
+            start_time: newEvent.start_time,
+            duration_minutes: newEvent.duration_minutes,
+            location: newEvent.location || null,
+            event_type: newEvent.event_type,
+            date: selectedDate,
+            google_event_id: googleEventId
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Type cast the new event
+        const newEventData: DailyEvent = {
+          ...data,
+          event_type: data.event_type as 'meeting' | 'task' | 'personal' | 'break'
+        };
+
+        createdEvents.push(newEventData);
       }
 
-      const { data, error } = await supabase
-        .from('daily_events')
-        .insert([{
-          user_id: user.id,
-          title: newEvent.title,
-          description: newEvent.description || null,
-          start_time: newEvent.start_time,
-          duration_minutes: newEvent.duration_minutes,
-          location: newEvent.location || null,
-          event_type: newEvent.event_type,
-          date: selectedDate,
-          google_event_id: googleEventId
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Type cast the new event
-      const newEventData: DailyEvent = {
-        ...data,
-        event_type: data.event_type as 'meeting' | 'task' | 'personal' | 'break'
-      };
-
-      setEvents([...events, newEventData]);
+      setEvents([...createdEvents, ...events]);
       setNewEvent({
         title: '',
         description: '',
@@ -143,14 +192,14 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
       });
       
       toast({
-        title: "Event Added",
-        description: googleEventId ? "Event added and synced to Google Calendar." : "Event added successfully.",
+        title: `${createdEvents.length} Event${createdEvents.length > 1 ? 's' : ''} Added! ✨`,
+        description: hasGoogleSync ? "Events added and synced to Google Calendar." : "Events added successfully.",
       });
     } catch (error) {
-      console.error('Error adding event:', error);
+      console.error('Error adding events:', error);
       toast({
         title: "Error",
-        description: "Failed to add event. Please try again.",
+        description: "Failed to add events. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -209,9 +258,16 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Button>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-            Daily Planner
-          </h1>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
+                <Sparkles className="h-8 w-8 text-purple-600" />
+                Daily Planner
+              </h1>
+              {isTyping && <TypingIndicator />}
+            </div>
+            <p className="text-gray-600 mt-1">Plan your day with smart bulk event creation</p>
+          </div>
         </div>
         
         {isConnected && (
@@ -236,17 +292,31 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
 
       <Card className="border-2 border-dashed border-purple-200 bg-purple-50/50">
         <CardHeader>
-          <CardTitle className="text-xl text-purple-800">Add New Event</CardTitle>
+          <CardTitle className="text-xl text-purple-800 flex items-center gap-2">
+            <Plus className="h-5 w-5" />
+            Add New Event(s)
+          </CardTitle>
+          <p className="text-sm text-purple-600">
+            💡 Tip: Paste multiple events separated by new lines, commas, or semicolons to create them all at once!
+          </p>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                placeholder="Event title..."
-                value={newEvent.title}
-                onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                className="font-medium"
-              />
+              <div className="space-y-2">
+                <Input
+                  placeholder="What's on your schedule? ✨ (supports bulk creation)"
+                  value={newEvent.title}
+                  onChange={(e) => handleEventInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addBulkEvents()}
+                  className="font-medium"
+                />
+                {splitEventsFromText(newEvent.title).length > 1 && (
+                  <div className="text-xs text-purple-600 bg-purple-50 p-2 rounded border border-purple-200">
+                    Will create {splitEventsFromText(newEvent.title).length} events
+                  </div>
+                )}
+              </div>
               <Input
                 type="time"
                 value={newEvent.start_time}
@@ -305,12 +375,14 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
                 )}
                 
                 <Button 
-                  onClick={addEvent} 
+                  onClick={addBulkEvents} 
                   disabled={!newEvent.title.trim() || !newEvent.start_time || loading}
                   className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Event
+                  {splitEventsFromText(newEvent.title).length > 1 
+                    ? `Create ${splitEventsFromText(newEvent.title).length} Events` 
+                    : 'Add Event'}
                 </Button>
               </div>
             </div>
