@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Mail, Sparkles, Download, Upload, Bell, Users, Wifi, WifiOff } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -242,6 +243,7 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
       }
       
       const createdTasks = [];
+      let hasGoogleSync = false;
       
       for (const taskTitle of tasksToCreate) {
         let googleEventId = null;
@@ -255,6 +257,7 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
           
           if (googleEvent) {
             googleEventId = googleEvent.id;
+            hasGoogleSync = true;
           }
         }
 
@@ -307,7 +310,7 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
       
       toast({
         title: `${createdTasks.length} Task${createdTasks.length > 1 ? 's' : ''} Added! ✨`,
-        description: googleEventId ? "Tasks added and synced to Google Calendar." : "Tasks added successfully.",
+        description: hasGoogleSync ? "Tasks added and synced to Google Calendar." : "Tasks added successfully.",
       });
     } catch (error) {
       console.error('Error adding tasks:', error);
