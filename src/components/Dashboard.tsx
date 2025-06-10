@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardData } from '@/hooks/useDashboardData';
-import BentoDashboard from '@/components/BentoDashboard';
+import ClassicDashboard from '@/components/ClassicDashboard';
 import TaskManager from './TaskManager';
 import ExpenseLogger from './ExpenseLogger';
 import MicroJournal from './MicroJournal';
@@ -67,15 +68,15 @@ const Dashboard = () => {
 
     if (activeView === 'calendar') {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-3 sm:p-6">
-          <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
-            <div className="flex items-center gap-2 sm:gap-4">
+        <div className="min-h-screen bg-background p-6">
+          <div className="max-w-6xl mx-auto space-y-6">
+            <div className="flex items-center gap-4">
               <Button variant="outline" onClick={() => setActiveView('dashboard')} size={isMobile ? "sm" : "default"}>
-                <ArrowLeft className="h-4 w-4 mr-1 sm:mr-2" />
+                <ArrowLeft className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Back to Dashboard</span>
                 <span className="sm:hidden">Back</span>
               </Button>
-              <h1 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold">
                 {isMobile ? 'Calendar' : 'Google Calendar Integration'}
               </h1>
             </div>
@@ -91,21 +92,21 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
-        {/* Enhanced Header */}
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-6 py-8 max-w-7xl">
+        {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-6 p-6 bg-white/80 backdrop-blur-sm rounded-2xl border border-white/20 shadow-lg">
+          <div className="flex items-center justify-between mb-6 p-6 bg-card rounded-lg border shadow-sm">
             <div className="flex items-center gap-4 flex-1 min-w-0">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
-                <span className="text-white font-bold text-lg">L</span>
+              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
+                <span className="text-primary-foreground font-bold text-lg">L</span>
               </div>
               <div className="min-w-0 flex-1">
-                <h1 className="text-2xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Welcome back, {user?.email?.split('@')[0] || 'User'}! 👋
+                <h1 className="text-3xl font-bold text-foreground">
+                  Welcome back, {user?.email?.split('@')[0] || 'User'}!
                 </h1>
-                <p className="text-gray-600 mt-1 text-sm sm:text-base">
-                  Your intelligent life dashboard
+                <p className="text-muted-foreground mt-1">
+                  Your personal dashboard
                 </p>
               </div>
             </div>
@@ -116,20 +117,19 @@ const Dashboard = () => {
                 size="sm"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="transition-all hover:scale-105"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              <div className="text-center bg-white/50 p-3 rounded-lg border">
-                <p className="text-sm text-gray-500">
+              <div className="text-center bg-muted p-3 rounded-lg border">
+                <p className="text-sm text-muted-foreground">
                   {new Date().toLocaleDateString('en-US', { 
                     weekday: 'short', 
                     month: 'short', 
                     day: 'numeric' 
                   })}
                 </p>
-                <p className="text-xl font-bold text-gray-700">
+                <p className="text-xl font-bold">
                   {new Date().toLocaleTimeString('en-US', { 
                     hour: '2-digit', 
                     minute: '2-digit'
@@ -140,17 +140,8 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Bento Grid Dashboard */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-800">Your Life at a Glance</h2>
-            <div className="text-sm text-gray-500">
-              Real-time updates • Auto-sync enabled
-            </div>
-          </div>
-          
-          <BentoDashboard onModuleClick={handleModuleClick} />
-        </div>
+        {/* Dashboard Content */}
+        <ClassicDashboard onModuleClick={handleModuleClick} />
       </div>
     </div>
   );
