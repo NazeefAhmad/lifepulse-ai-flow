@@ -12,6 +12,8 @@ import GoogleCalendarIntegration from './GoogleCalendarIntegration';
 import DailyPlannerManager from './DailyPlannerManager';
 import RelationshipCare from './RelationshipCare';
 import FocusMode from './FocusMode';
+import NotificationSystem from './NotificationSystem';
+import ForceUpdater from './ForceUpdater';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const Dashboard = () => {
@@ -112,6 +114,8 @@ const Dashboard = () => {
             </div>
             
             <div className="flex items-center gap-4 flex-shrink-0">
+              <NotificationSystem />
+              
               <Button
                 variant="outline"
                 size="sm"
@@ -143,6 +147,9 @@ const Dashboard = () => {
         {/* Dashboard Content */}
         <ClassicDashboard onModuleClick={handleModuleClick} />
       </div>
+      
+      {/* Force Updater - only shows when update is available */}
+      <ForceUpdater />
     </div>
   );
 };

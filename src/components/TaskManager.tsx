@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Mail, Sparkles, Download, Upload, Bell, Users } from 'lucide-react';
+import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Mail, Sparkles, Download, Upload, Bell, Users, Wifi, WifiOff } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,8 @@ import { useTaskNotifications } from '@/hooks/useTaskNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import TaskFilters from './TaskFilters';
+import TypingIndicator from './TypingIndicator';
+import NoInternetScreen from './NoInternetScreen';
 
 interface Task {
   id: string;
@@ -52,6 +54,27 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [dueDateStart, setDueDateStart] = useState('');
   const [dueDateEnd, setDueDateEnd] = useState('');
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isTyping, setIsTyping] = useState(false);
+
+  // Network status monitoring
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Show no internet screen if offline
+  if (!isOnline) {
+    return <NoInternetScreen onRetry={() => window.location.reload()} />;
+  }
 
   useEffect(() => {
     if (user) {
@@ -172,63 +195,109 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
     }
   };
 
-  const addTask = async () => {
+  const splitTasksFromText = (text: string): string[] => {
+    // Split by common delimiters that indicate separate tasks
+    const delimiters = ['\n', ';', ',', '|', '•', '-', '*'];
+    let tasks = [text];
+    
+    delimiters.forEach(delimiter => {
+      tasks = tasks.flatMap(task => 
+        task.split(delimiter).map(t => t.trim()).filter(t => t.length > 0)
+      );
+    });
+    
+    // Filter out very short tasks (likely not meaningful)
+    return tasks.filter(task => task.length > 2);
+  };
+
+  const handleTaskInput = (value: string) => {
+    setNewTask(value);
+    
+    // Show typing indicator
+    setIsTyping(true);
+    setTimeout(() => setIsTyping(false), 1000);
+    
+    // Check if input contains multiple tasks
+    const potentialTasks = splitTasksFromText(value);
+    if (potentialTasks.length > 1) {
+      // Show preview of how many tasks will be created
+      console.log(`Will create ${potentialTasks.length} tasks:`, potentialTasks);
+    }
+  };
+
+  const addBulkTasks = async () => {
     if (!newTask.trim() || !user) return;
     
     try {
       setLoading(true);
       
-      let googleEventId = null;
+      const tasksToCreate = splitTasksFromText(newTask);
+      console.log('Creating bulk tasks:', tasksToCreate);
       
-      if (syncToGoogle && isConnected && newDueDate) {
-        const googleEvent = await createTaskEvent({
-          title: newTask,
-          dueDate: newDueDate,
-          priority: newPriority
+      if (tasksToCreate.length > 1) {
+        toast({
+          title: `Creating ${tasksToCreate.length} tasks...`,
+          description: "Processing your bulk task creation",
         });
+      }
+      
+      const createdTasks = [];
+      
+      for (const taskTitle of tasksToCreate) {
+        let googleEventId = null;
         
-        if (googleEvent) {
-          googleEventId = googleEvent.id;
+        if (syncToGoogle && isConnected && newDueDate) {
+          const googleEvent = await createTaskEvent({
+            title: taskTitle,
+            dueDate: newDueDate,
+            priority: newPriority
+          });
+          
+          if (googleEvent) {
+            googleEventId = googleEvent.id;
+          }
+        }
+
+        const taskData = {
+          user_id: user.id,
+          title: taskTitle,
+          description: newDescription || null,
+          priority: newPriority,
+          status: 'pending',
+          due_date: newDueDate || null,
+          google_event_id: googleEventId,
+          assigned_to_email: assignedToEmail || null,
+          assigned_to_name: assignedToName || null
+        };
+
+        const { data, error } = await supabase
+          .from('tasks')
+          .insert([taskData])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        const newTaskData: Task = {
+          ...data,
+          priority: data.priority as 'low' | 'medium' | 'high',
+          status: data.status as 'pending' | 'in-progress' | 'completed'
+        };
+
+        createdTasks.push(newTaskData);
+        
+        // Send assignment email if task is assigned to someone
+        if (assignedToEmail) {
+          await sendTaskAssignmentEmail({
+            ...taskData,
+            assigned_to_email: assignedToEmail,
+            assigned_to_name: assignedToName
+          });
         }
       }
 
-      const taskData = {
-        user_id: user.id,
-        title: newTask,
-        description: newDescription || null,
-        priority: newPriority,
-        status: 'pending',
-        due_date: newDueDate || null,
-        google_event_id: googleEventId,
-        assigned_to_email: assignedToEmail || null,
-        assigned_to_name: assignedToName || null
-      };
-
-      const { data, error } = await supabase
-        .from('tasks')
-        .insert([taskData])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      const newTaskData: Task = {
-        ...data,
-        priority: data.priority as 'low' | 'medium' | 'high',
-        status: data.status as 'pending' | 'in-progress' | 'completed'
-      };
-
-      setTasks([newTaskData, ...tasks]);
+      setTasks([...createdTasks, ...tasks]);
       
-      // Send assignment email if task is assigned to someone
-      if (assignedToEmail) {
-        await sendTaskAssignmentEmail({
-          ...taskData,
-          assigned_to_email: assignedToEmail,
-          assigned_to_name: assignedToName
-        });
-      }
-
       // Reset form
       setNewTask('');
       setNewDescription('');
@@ -237,14 +306,14 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
       setAssignedToName('');
       
       toast({
-        title: "Task Added! ✨",
-        description: googleEventId ? "Task added and synced to Google Calendar." : "Task added successfully.",
+        title: `${createdTasks.length} Task${createdTasks.length > 1 ? 's' : ''} Added! ✨`,
+        description: googleEventId ? "Tasks added and synced to Google Calendar." : "Tasks added successfully.",
       });
     } catch (error) {
-      console.error('Error adding task:', error);
+      console.error('Error adding tasks:', error);
       toast({
         title: "Error",
-        description: "Failed to add task. Please try again.",
+        description: "Failed to add tasks. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -377,6 +446,7 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
 
   return (
     <div className="space-y-6 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen p-6">
+      {/* Header with typing indicator */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button 
@@ -388,15 +458,30 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
             Back to Dashboard
           </Button>
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
-              <Sparkles className="h-8 w-8 text-purple-600" />
-              Smart Task Manager
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
+                <Sparkles className="h-8 w-8 text-purple-600" />
+                Smart Task Manager
+              </h1>
+              {isTyping && <TypingIndicator />}
+            </div>
             <p className="text-gray-600 mt-1">Organize, assign, and track your tasks with AI assistance</p>
           </div>
         </div>
         
         <div className="flex items-center gap-3">
+          {/* Network status indicator */}
+          <div className="flex items-center gap-2">
+            {isOnline ? (
+              <Wifi className="h-4 w-4 text-green-600" />
+            ) : (
+              <WifiOff className="h-4 w-4 text-red-600" />
+            )}
+            <span className="text-sm text-gray-600">
+              {isOnline ? 'Online' : 'Offline'}
+            </span>
+          </div>
+          
           {isConnected && (
             <>
               <Button
@@ -436,24 +521,34 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
         </div>
       </div>
 
-      {/* Enhanced Add Task Card */}
+      {/* Enhanced Add Task Card with bulk creation support */}
       <Card className="border-2 border-dashed border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 shadow-lg">
         <CardHeader className="pb-4">
           <CardTitle className="text-xl text-purple-800 flex items-center gap-2">
             <Plus className="h-5 w-5" />
-            Create New Task
+            Create New Task(s)
           </CardTitle>
+          <p className="text-sm text-purple-600">
+            💡 Tip: Paste multiple tasks separated by new lines, commas, or semicolons to create them all at once!
+          </p>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                placeholder="What needs to be done? ✨"
-                value={newTask}
-                onChange={(e) => setNewTask(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && addTask()}
-                className="font-medium bg-white/80 border-purple-200 focus:border-purple-400"
-              />
+              <div className="space-y-2">
+                <Input
+                  placeholder="What needs to be done? ✨ (supports bulk creation)"
+                  value={newTask}
+                  onChange={(e) => handleTaskInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addBulkTasks()}
+                  className="font-medium bg-white/80 border-purple-200 focus:border-purple-400"
+                />
+                {splitTasksFromText(newTask).length > 1 && (
+                  <div className="text-xs text-purple-600 bg-purple-50 p-2 rounded border border-purple-200">
+                    Will create {splitTasksFromText(newTask).length} tasks
+                  </div>
+                )}
+              </div>
               <Input
                 placeholder="Add description (optional)"
                 value={newDescription}
@@ -518,12 +613,14 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
               )}
               
               <Button 
-                onClick={addTask} 
+                onClick={addBulkTasks} 
                 disabled={!newTask.trim() || loading}
                 className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-2 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                {assignedToEmail ? 'Create & Assign' : 'Create Task'}
+                {splitTasksFromText(newTask).length > 1 
+                  ? `Create ${splitTasksFromText(newTask).length} Tasks` 
+                  : assignedToEmail ? 'Create & Assign' : 'Create Task'}
               </Button>
             </div>
 
