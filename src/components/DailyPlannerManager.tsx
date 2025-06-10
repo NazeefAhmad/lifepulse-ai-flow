@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Clock, MapPin, Calendar, Trash2, Edit3, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, Clock, MapPin, Calendar, Trash2, Edit3, Sparkles, Check, PlayCircle, Circle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ interface DailyEvent {
   date: string;
   google_event_id?: string;
   created_at: string;
+  status?: 'todo' | 'in-progress' | 'done';
 }
 
 interface DailyPlannerManagerProps {
@@ -66,10 +67,11 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
 
       if (error) throw error;
       
-      // Type cast the data to ensure proper types
+      // Type cast the data to ensure proper types and add default status
       const typedEvents: DailyEvent[] = (data || []).map(event => ({
         ...event,
-        event_type: event.event_type as 'meeting' | 'task' | 'personal' | 'break'
+        event_type: event.event_type as 'meeting' | 'task' | 'personal' | 'break',
+        status: (event as any).status || 'todo' // Default to 'todo' if no status
       }));
       
       setEvents(typedEvents);
@@ -111,6 +113,43 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
     const potentialEvents = splitEventsFromText(value);
     if (potentialEvents.length > 1) {
       console.log(`Will create ${potentialEvents.length} events:`, potentialEvents);
+    }
+  };
+
+  const toggleEventStatus = async (eventId: string, currentStatus: string) => {
+    try {
+      const statusCycle = ['todo', 'in-progress', 'done'];
+      const currentIndex = statusCycle.indexOf(currentStatus || 'todo');
+      const nextStatus = statusCycle[(currentIndex + 1) % statusCycle.length];
+
+      const { error } = await supabase
+        .from('daily_events')
+        .update({ 
+          status: nextStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', eventId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      setEvents(events.map(event => 
+        event.id === eventId ? { ...event, status: nextStatus as 'todo' | 'in-progress' | 'done' } : event
+      ));
+
+      if (nextStatus === 'done') {
+        toast({
+          title: "Event Completed! 🎉",
+          description: "Great job finishing this event!",
+        });
+      }
+    } catch (error) {
+      console.error('Error updating event status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update event status.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -164,7 +203,8 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
             location: newEvent.location || null,
             event_type: newEvent.event_type,
             date: selectedDate,
-            google_event_id: googleEventId
+            google_event_id: googleEventId,
+            status: 'todo'
           }])
           .select()
           .single();
@@ -174,7 +214,8 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
         // Type cast the new event
         const newEventData: DailyEvent = {
           ...data,
-          event_type: data.event_type as 'meeting' | 'task' | 'personal' | 'break'
+          event_type: data.event_type as 'meeting' | 'task' | 'personal' | 'break',
+          status: 'todo'
         };
 
         createdEvents.push(newEventData);
@@ -242,6 +283,30 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
     }
   };
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'done': return <Check className="h-4 w-4 text-green-600" />;
+      case 'in-progress': return <PlayCircle className="h-4 w-4 text-blue-600" />;
+      default: return <Circle className="h-4 w-4 text-gray-600" />;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'done': return 'bg-green-50 border-green-200';
+      case 'in-progress': return 'bg-blue-50 border-blue-200';
+      default: return 'bg-gray-50 border-gray-200';
+    }
+  };
+
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'done': return 'bg-green-100 text-green-800 border-green-200';
+      case 'in-progress': return 'bg-blue-100 text-blue-800 border-blue-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
   const formatTime = (time: string) => {
     return new Date(`1970-01-01T${time}`).toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -266,7 +331,7 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
               </h1>
               {isTyping && <TypingIndicator />}
             </div>
-            <p className="text-gray-600 mt-1">Plan your day with smart bulk event creation</p>
+            <p className="text-gray-600 mt-1">Plan your day with smart bulk event creation and status tracking</p>
           </div>
         </div>
         
@@ -288,8 +353,20 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
         <Badge variant="outline">
           {events.length} event{events.length !== 1 ? 's' : ''} scheduled
         </Badge>
+        <div className="flex items-center gap-2">
+          <Badge className="bg-gray-100 text-gray-800 border-gray-200">
+            Todo: {events.filter(e => (e.status || 'todo') === 'todo').length}
+          </Badge>
+          <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+            In Progress: {events.filter(e => e.status === 'in-progress').length}
+          </Badge>
+          <Badge className="bg-green-100 text-green-800 border-green-200">
+            Done: {events.filter(e => e.status === 'done').length}
+          </Badge>
+        </div>
       </div>
 
+      
       <Card className="border-2 border-dashed border-purple-200 bg-purple-50/50">
         <CardHeader>
           <CardTitle className="text-xl text-purple-800 flex items-center gap-2">
@@ -403,10 +480,21 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
       ) : (
         <div className="grid gap-4">
           {events.map((event) => (
-            <Card key={event.id} className="transition-all border-2 hover:shadow-md">
+            <Card key={event.id} className={`transition-all border-2 hover:shadow-md ${getStatusColor(event.status || 'todo')} ${
+              event.status === 'done' ? 'opacity-75' : ''
+            }`}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 flex-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleEventStatus(event.id, event.status || 'todo')}
+                      className="p-2 hover:bg-white/50 rounded-full"
+                    >
+                      {getStatusIcon(event.status || 'todo')}
+                    </Button>
+                    
                     <div className="flex flex-col items-center">
                       <Clock className="h-5 w-5 text-purple-600" />
                       <span className="text-sm font-medium">{formatTime(event.start_time)}</span>
@@ -415,7 +503,9 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
                     
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-gray-800">{event.title}</h3>
+                        <h3 className={`font-semibold ${event.status === 'done' ? 'line-through text-gray-500' : 'text-gray-800'}`}>
+                          {event.title}
+                        </h3>
                         {event.google_event_id && (
                           <Calendar className="h-4 w-4 text-green-600" />
                         )}
@@ -433,9 +523,14 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
                       )}
                     </div>
                     
-                    <Badge className={getEventTypeColor(event.event_type)}>
-                      {event.event_type}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge className={getEventTypeColor(event.event_type)}>
+                        {event.event_type}
+                      </Badge>
+                      <Badge className={getStatusBadgeColor(event.status || 'todo')}>
+                        {event.status || 'todo'}
+                      </Badge>
+                    </div>
                   </div>
                   
                   <Button
