@@ -90,10 +90,10 @@ const BentoDashboard = ({ onModuleClick }: BentoDashboardProps) => {
         <div className="h-full flex flex-col justify-between text-white p-4">
           <div className="flex items-center justify-between">
             <CheckSquare className="h-6 w-6" />
-            <Badge className="bg-white/20 text-white text-xs">{data?.tasks?.pending || 0}</Badge>
+            <Badge className="bg-white/20 text-white text-xs">{data?.tasksToday?.total - data?.tasksToday?.completed || 0}</Badge>
           </div>
           <div>
-            <div className="text-2xl font-bold">{data?.tasks?.completed || 0}</div>
+            <div className="text-2xl font-bold">{data?.tasksToday?.completed || 0}</div>
             <div className="text-sm opacity-90">Tasks Done</div>
           </div>
           <Button 
@@ -118,7 +118,7 @@ const BentoDashboard = ({ onModuleClick }: BentoDashboardProps) => {
             <Badge className="bg-white/20 text-white text-xs">Today</Badge>
           </div>
           <div>
-            <div className="text-2xl font-bold">${data?.expenses?.today || 0}</div>
+            <div className="text-2xl font-bold">${data?.todaysSpend || 0}</div>
             <div className="text-sm opacity-90">Spent Today</div>
           </div>
           <Button 
@@ -165,7 +165,7 @@ const BentoDashboard = ({ onModuleClick }: BentoDashboardProps) => {
         <div className="h-full flex flex-col justify-between text-white p-4">
           <div className="flex items-center justify-between">
             <BookOpen className="h-6 w-6" />
-            <Badge className="bg-white/20 text-white text-xs">{data?.journalEntries || 0}</Badge>
+            <Badge className="bg-white/20 text-white text-xs">Write</Badge>
           </div>
           <div>
             <div className="text-lg font-semibold">Micro Journal</div>
