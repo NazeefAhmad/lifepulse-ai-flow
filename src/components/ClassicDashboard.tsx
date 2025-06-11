@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Clock, Target, DollarSign, BookOpen, Calendar, Heart, CheckSquare, Timer, TrendingUp, Play, Pause, RotateCcw } from 'lucide-react';
+import { Clock, Target, DollarSign, BookOpen, Calendar, Heart, CheckSquare, Timer, TrendingUp, Play, Pause, RotateCcw, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { usePomodoroContext } from '@/contexts/PomodoroContext';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { useLiveUsers } from '@/hooks/useLiveUsers';
 import { useAuth } from '@/hooks/useAuth';
 import MoodCheckIn from './MoodCheckIn';
 
@@ -17,6 +18,7 @@ interface ClassicDashboardProps {
 const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
   const { user } = useAuth();
   const { data, refreshData } = useDashboardData();
+  const { liveUsersCount, loading: liveUsersLoading } = useLiveUsers();
   const {
     isActive,
     isPaused,
@@ -30,13 +32,6 @@ const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
     pauseTimer,
     stopTimer
   } = usePomodoroContext();
-
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   return (
     <div className="space-y-8">
@@ -68,33 +63,28 @@ const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
 
         <Card className="border shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Expenses</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Live Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${data?.todaysSpend || 0}</div>
-            <p className="text-xs text-muted-foreground">Today's spending</p>
+            <div className="text-2xl font-bold">
+              {liveUsersLoading ? '...' : liveUsersCount.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">Online now</p>
           </CardContent>
         </Card>
 
         <Card className="border shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Current Time</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Mood Score</CardTitle>
+            <Heart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {currentTime.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit'
-              })}
+              {data?.moodScore || '7.5'}/10
             </div>
             <p className="text-xs text-muted-foreground">
-              {currentTime.toLocaleDateString('en-US', { 
-                weekday: 'long',
-                month: 'short',
-                day: 'numeric'
-              })}
+              Recent average
             </p>
           </CardContent>
         </Card>
@@ -199,7 +189,7 @@ const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
             <CardTitle className="flex items-center gap-2 text-lg">
               <DollarSign className="h-5 w-5" />
               Expenses
-            </CardTitle>
+            </Title>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">Track your daily expenses</p>

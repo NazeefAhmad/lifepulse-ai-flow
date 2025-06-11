@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Heart, Smile, Meh, Frown, Zap } from 'lucide-react';
+import React, { useState } from 'react';
+import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -15,7 +15,6 @@ const MoodCheckIn = ({ onMoodUpdated }: MoodCheckInProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [shouldShow, setShouldShow] = useState(false);
 
   const moods = [
     { emoji: '😄', mood: 'excellent', label: 'Excellent', color: 'text-green-600', bg: 'bg-green-50 hover:bg-green-100' },
@@ -24,48 +23,6 @@ const MoodCheckIn = ({ onMoodUpdated }: MoodCheckInProps) => {
     { emoji: '😔', mood: 'low', label: 'Low', color: 'text-orange-600', bg: 'bg-orange-50 hover:bg-orange-100' },
     { emoji: '😫', mood: 'stressed', label: 'Stressed', color: 'text-red-600', bg: 'bg-red-50 hover:bg-red-100' }
   ];
-
-  useEffect(() => {
-    checkMoodVisibility();
-  }, [user]);
-
-  const checkMoodVisibility = async () => {
-    if (!user) return;
-
-    try {
-      const now = new Date();
-      const today = now.toISOString().split('T')[0];
-      
-      // Get today's mood check-ins
-      const { data: todayMoods } = await supabase
-        .from('mood_checkins')
-        .select('created_at')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .order('created_at', { ascending: false });
-
-      if (!todayMoods || todayMoods.length === 0) {
-        // No moods today, show it
-        setShouldShow(true);
-        return;
-      }
-
-      if (todayMoods.length >= 2) {
-        // Already logged 2 moods today, don't show
-        setShouldShow(false);
-        return;
-      }
-
-      // Check if last mood was more than 12 hours ago
-      const lastMoodTime = new Date(todayMoods[0].created_at);
-      const hoursSinceLastMood = (now.getTime() - lastMoodTime.getTime()) / (1000 * 60 * 60);
-      
-      setShouldShow(hoursSinceLastMood >= 12);
-    } catch (error) {
-      console.error('Error checking mood visibility:', error);
-      setShouldShow(true); // Default to showing if there's an error
-    }
-  };
 
   const handleMoodCheck = async (mood: string) => {
     if (!user) return;
@@ -82,9 +39,6 @@ const MoodCheckIn = ({ onMoodUpdated }: MoodCheckInProps) => {
 
       if (error) throw error;
 
-      // Hide the component after logging
-      setShouldShow(false);
-      
       onMoodUpdated?.();
       toast({
         title: "Mood Logged! 💕",
@@ -101,10 +55,6 @@ const MoodCheckIn = ({ onMoodUpdated }: MoodCheckInProps) => {
       setLoading(false);
     }
   };
-
-  if (!shouldShow) {
-    return null;
-  }
 
   return (
     <Card className="bg-gradient-to-r from-pink-50 to-purple-50 border-pink-200">
