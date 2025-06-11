@@ -20,6 +20,7 @@ export type Database = {
           id: string
           location: string | null
           start_time: string
+          status: string | null
           title: string
           user_id: string
         }
@@ -33,6 +34,7 @@ export type Database = {
           id?: string
           location?: string | null
           start_time: string
+          status?: string | null
           title: string
           user_id: string
         }
@@ -46,6 +48,7 @@ export type Database = {
           id?: string
           location?: string | null
           start_time?: string
+          status?: string | null
           title?: string
           user_id?: string
         }

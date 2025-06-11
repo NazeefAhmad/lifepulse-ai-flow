@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Clock, MapPin, Calendar, Trash2, Edit3, Sparkles, Check, PlayCircle, Circle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,7 +72,7 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
       const typedEvents: DailyEvent[] = (data || []).map(event => ({
         ...event,
         event_type: event.event_type as 'meeting' | 'task' | 'personal' | 'break',
-        status: (event as any).status || 'todo' // Default to 'todo' if no status
+        status: (event.status as 'todo' | 'in-progress' | 'done') || 'todo'
       }));
       
       setEvents(typedEvents);
@@ -125,8 +126,7 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
       const { error } = await supabase
         .from('daily_events')
         .update({ 
-          status: nextStatus,
-          updated_at: new Date().toISOString()
+          status: nextStatus
         })
         .eq('id', eventId)
         .eq('user_id', user?.id);
