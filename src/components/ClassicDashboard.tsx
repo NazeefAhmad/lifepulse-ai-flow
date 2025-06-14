@@ -189,7 +189,7 @@ const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
             <CardTitle className="flex items-center gap-2 text-lg">
               <DollarSign className="h-5 w-5" />
               Expenses
-            </Title>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">Track your daily expenses</p>
