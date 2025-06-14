@@ -173,15 +173,7 @@ export const PomodoroProvider = ({ children }: { children: React.ReactNode }) =>
   };
 
   const startTimer = () => {
-    if (state.currentSession === 'focus' && !state.selectedTask) {
-      toast({
-        title: "Select a Task",
-        description: "Please select a task to focus on.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+    // Removed mandatory task selection - users can now start focus sessions without selecting a task
     setState(prev => ({ ...prev, isActive: true, isPaused: false }));
   };
 

@@ -276,15 +276,7 @@ const FocusMode = ({ onBack }: FocusModeProps) => {
   };
 
   const startTimer = () => {
-    if (currentSession === 'focus' && !selectedTask) {
-      toast({
-        title: "Select a Task",
-        description: "Please select a task to focus on.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+    // Removed the mandatory task selection check
     setIsActive(true);
     setIsPaused(false);
   };
@@ -362,7 +354,11 @@ const FocusMode = ({ onBack }: FocusModeProps) => {
           <TabsContent value="timer">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Enhanced Timer Card */}
-              <Card className="lg:col-span-2 bg-gradient-to-br from-white to-purple-50 border-2 border-purple-200 shadow-xl">
+              <Card className={`lg:col-span-2 bg-gradient-to-br from-white to-purple-50 border-2 border-purple-200 shadow-xl ${
+                isActive && !isPaused 
+                  ? 'shadow-lg ring-2 ring-blue-100 ring-opacity-50 animate-pulse' 
+                  : ''
+              }`}>
                 <CardHeader className="text-center pb-4">
                   <CardTitle className="flex items-center justify-center gap-2 text-2xl">
                     <Timer className="h-6 w-6 text-purple-600" />
@@ -373,7 +369,11 @@ const FocusMode = ({ onBack }: FocusModeProps) => {
                 <CardContent className="space-y-6">
                   {/* Timer Display */}
                   <div className="text-center">
-                    <div className="text-8xl font-mono font-bold text-purple-600 mb-4 drop-shadow-lg">
+                    <div className={`text-8xl font-mono font-bold text-purple-600 mb-4 drop-shadow-lg ${
+                      isActive && !isPaused 
+                        ? 'drop-shadow-lg text-blue-600' 
+                        : ''
+                    }`}>
                       {formatTime(timeLeft)}
                     </div>
                     <Progress value={progress} className="h-4 mb-4" />
