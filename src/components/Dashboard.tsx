@@ -9,6 +9,7 @@ import TaskManager from './TaskManager';
 import ExpenseLogger from './ExpenseLogger';
 import MicroJournal from './MicroJournal';
 import GoogleCalendarIntegration from './GoogleCalendarIntegration';
+import DailyPlanner from './DailyPlanner';
 import DailyPlannerManager from './DailyPlannerManager';
 import RelationshipCare from './RelationshipCare';
 import FocusMode from './FocusMode';
@@ -21,7 +22,7 @@ const Dashboard = () => {
   const { data, loading, refreshData } = useDashboardData();
   const isMobile = useIsMobile();
   
-  const [activeView, setActiveView] = useState<'dashboard' | 'tasks' | 'expenses' | 'journal' | 'planner' | 'relationship' | 'calendar' | 'focus'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'tasks' | 'expenses' | 'journal' | 'planner' | 'planner-advanced' | 'relationship' | 'calendar' | 'focus'>('dashboard');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
@@ -44,7 +45,7 @@ const Dashboard = () => {
   };
 
   const handleModuleClick = (module: string) => {
-    setActiveView(module as 'dashboard' | 'tasks' | 'expenses' | 'journal' | 'planner' | 'relationship' | 'calendar' | 'focus');
+    setActiveView(module as 'dashboard' | 'tasks' | 'expenses' | 'journal' | 'planner' | 'planner-advanced' | 'relationship' | 'calendar' | 'focus');
   };
 
   if (activeView !== 'dashboard') {
@@ -61,6 +62,10 @@ const Dashboard = () => {
     }
 
     if (activeView === 'planner') {
+      return <DailyPlanner onBack={() => setActiveView('dashboard')} />;
+    }
+
+    if (activeView === 'planner-advanced') {
       return <DailyPlannerManager onBack={() => setActiveView('dashboard')} />;
     }
 

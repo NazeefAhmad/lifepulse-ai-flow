@@ -1,255 +1,169 @@
-
 import React, { useState, useEffect } from 'react';
-import { Clock, Target, DollarSign, BookOpen, Calendar, Heart, CheckSquare, Timer, TrendingUp, Play, Pause, RotateCcw, Users } from 'lucide-react';
+import { 
+  CheckSquare, 
+  DollarSign, 
+  BookOpen, 
+  Calendar, 
+  Heart, 
+  Users, 
+  Target, 
+  Clock,
+  Smile,
+  TrendingUp,
+  Plus,
+  ArrowRight,
+  Activity,
+  CalendarDays
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { usePomodoroContext } from '@/contexts/PomodoroContext';
-import { useDashboardData } from '@/hooks/useDashboardData';
 import { useLiveUsers } from '@/hooks/useLiveUsers';
-import { useAuth } from '@/hooks/useAuth';
-import MoodCheckIn from './MoodCheckIn';
+import { useDashboardData } from '@/hooks/useDashboardData';
 
 interface ClassicDashboardProps {
   onModuleClick: (module: string) => void;
 }
 
 const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
-  const { user } = useAuth();
-  const { data, refreshData } = useDashboardData();
-  const { liveUsersCount, loading: liveUsersLoading } = useLiveUsers();
-  const {
-    isActive,
-    isPaused,
-    timeLeft,
-    currentSession,
-    sessionCount,
-    totalFocusTime,
-    formatTime,
-    progress,
-    startTimer,
-    pauseTimer,
-    stopTimer
-  } = usePomodoroContext();
+  const { liveUsers } = useLiveUsers();
+  const { data } = useDashboardData();
+
+  const statsOverview = [
+    {
+      label: 'Live Users',
+      value: liveUsers,
+      icon: Users,
+      color: 'text-blue-500',
+    },
+    {
+      label: 'Tasks Completed',
+      value: data?.taskStats?.completed || 0,
+      icon: CheckSquare,
+      color: 'text-green-500',
+    },
+    {
+      label: 'Expenses This Month',
+      value: `$${data?.totalExpenses || 0}`,
+      icon: DollarSign,
+      color: 'text-yellow-500',
+    },
+    {
+      label: 'Journal Entries',
+      value: data?.journalEntries || 0,
+      icon: BookOpen,
+      color: 'text-indigo-500',
+    },
+  ];
+
+  const modules = [
+    {
+      icon: CheckSquare,
+      title: 'Task Manager',
+      description: 'Organize and track your daily tasks',
+      color: 'from-blue-500 to-blue-600',
+      borderColor: 'border-blue-200',
+      bgColor: 'bg-blue-50',
+      iconColor: 'text-blue-600',
+      onClick: () => onModuleClick('tasks'),
+      stats: `${data?.taskStats?.total || 0} tasks`
+    },
+    {
+      icon: Calendar,
+      title: 'Simple Daily Planner',
+      description: 'Plan your day with events and meetings',
+      color: 'from-green-500 to-green-600',
+      borderColor: 'border-green-200',
+      bgColor: 'bg-green-50',
+      iconColor: 'text-green-600',
+      onClick: () => onModuleClick('planner'),
+      stats: 'Today\'s schedule'
+    },
+    {
+      icon: CalendarDays,
+      title: 'Advanced Planner',
+      description: 'Smart bulk event creation with Google sync',
+      color: 'from-purple-500 to-purple-600',
+      borderColor: 'border-purple-200',
+      bgColor: 'bg-purple-50',
+      iconColor: 'text-purple-600',
+      onClick: () => onModuleClick('planner-advanced'),
+      stats: 'AI-powered'
+    },
+    {
+      icon: DollarSign,
+      title: 'Expense Logger',
+      description: 'Track your spending and budgets',
+      color: 'from-yellow-500 to-yellow-600',
+      borderColor: 'border-yellow-200',
+      bgColor: 'bg-yellow-50',
+      iconColor: 'text-yellow-600',
+      onClick: () => onModuleClick('expenses'),
+      stats: `$${data?.totalExpenses || 0} this month`
+    },
+    {
+      icon: BookOpen,
+      title: 'Micro Journal',
+      description: 'Quick thoughts and daily reflections',
+      color: 'from-indigo-500 to-indigo-600',
+      borderColor: 'border-indigo-200',
+      bgColor: 'bg-indigo-50',
+      iconColor: 'text-indigo-600',
+      onClick: () => onModuleClick('journal'),
+      stats: `${data?.journalEntries || 0} entries`
+    },
+    {
+      icon: Heart,
+      title: 'Relationship Care',
+      description: 'Nurture your relationships with reminders',
+      color: 'from-pink-500 to-pink-600',
+      borderColor: 'border-pink-200',
+      bgColor: 'bg-pink-50',
+      iconColor: 'text-pink-600',
+      onClick: () => onModuleClick('relationship'),
+      stats: `${data?.relationshipReminders || 0} reminders`
+    }
+  ];
 
   return (
-    <div className="space-y-8">
+    <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow bg-white">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Tasks Today</CardTitle>
-            <CheckSquare className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-black">{data?.tasksToday?.completed || 0}/{data?.tasksToday?.total || 0}</div>
-            <p className="text-xs text-gray-600">
-              {data?.tasksToday?.total ? Math.round((data.tasksToday.completed / data.tasksToday.total) * 100) : 0}% completed
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow bg-white">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Focus Time</CardTitle>
-            <Timer className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-black">{Math.floor(totalFocusTime / 60)}h {totalFocusTime % 60}m</div>
-            <p className="text-xs text-gray-600">Today's sessions: {sessionCount}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow bg-white">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Live Users</CardTitle>
-            <Users className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-black">
-              {liveUsersLoading ? '...' : liveUsersCount.toLocaleString()}
-            </div>
-            <p className="text-xs text-gray-600">Online now</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow bg-white">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Mood Score</CardTitle>
-            <Heart className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-black">
-              {data?.moodScore || '7.5'}/10
-            </div>
-            <p className="text-xs text-gray-600">
-              Recent average
-            </p>
-          </CardContent>
-        </Card>
+      <div className="col-span-1 md:col-span-2 lg:col-span-3 grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+        {statsOverview.map((stat, index) => (
+          <Card key={index} className="bg-white border-black shadow-sm">
+            <CardContent className="flex flex-row items-center justify-between space-y-0 p-6">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-600">{stat.label}</p>
+                <div className="text-2xl font-semibold text-black">{stat.value}</div>
+              </div>
+              <stat.icon className={`h-8 w-8 ${stat.color}`} />
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Focus Timer */}
-        <Card className="lg:col-span-2 border border-black shadow-sm bg-white">
-          <CardHeader>
+      {/* Modules */}
+      {modules.map((module, index) => (
+        <Card 
+          key={index} 
+          className={`bg-white border-black shadow-sm hover:shadow-md transition-shadow border-l-4 ${module.borderColor} cursor-pointer`}
+          onClick={module.onClick}
+        >
+          <CardContent className="p-6 space-y-2">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <h3 className="text-xl font-semibold text-black">{module.title}</h3>
+                <p className="text-sm text-gray-500">{module.description}</p>
+              </div>
+              <module.icon className={`h-8 w-8 ${module.iconColor}`} />
+            </div>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Timer className="h-6 w-6 text-black" />
-                <div>
-                  <CardTitle className="text-black">Focus Timer</CardTitle>
-                  <p className="text-sm text-gray-600">Pomodoro technique</p>
-                </div>
-              </div>
-              {isActive && (
-                <Badge variant={isPaused ? "secondary" : "default"} className={isPaused ? "bg-gray-200 text-black" : "bg-black text-white"}>
-                  {isPaused ? 'Paused' : 'Active'}
-                </Badge>
-              )}
+              <Badge className="bg-gray-100 text-gray-800 border-gray-200">{module.stats}</Badge>
+              <ArrowRight className="h-4 w-4 text-gray-500" />
             </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="text-center">
-              <div className="text-6xl font-mono font-bold mb-4 text-black">
-                {formatTime(timeLeft)}
-              </div>
-              <div className="space-y-2">
-                <Progress value={progress} className="h-2" />
-                <p className="text-sm text-gray-600">
-                  {currentSession === 'focus' ? 'Focus Session' : 'Break Time'} #{sessionCount + 1}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex justify-center gap-3">
-              {!isActive ? (
-                <Button onClick={startTimer} className="px-8 bg-black text-white hover:bg-gray-800">
-                  <Play className="h-4 w-4 mr-2" />
-                  Start Focus
-                </Button>
-              ) : (
-                <>
-                  <Button onClick={pauseTimer} variant="outline" className="border-black text-black hover:bg-black hover:text-white">
-                    <Pause className="h-4 w-4 mr-2" />
-                    {isPaused ? 'Resume' : 'Pause'}
-                  </Button>
-                  <Button onClick={stopTimer} variant="destructive" className="bg-red-600 text-white hover:bg-red-700">
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Reset
-                  </Button>
-                </>
-              )}
-            </div>
-
-            <Button 
-              onClick={() => onModuleClick('focus')} 
-              variant="outline" 
-              className="w-full border-black text-black hover:bg-black hover:text-white"
-            >
-              Advanced Focus Settings
-            </Button>
           </CardContent>
         </Card>
-
-        {/* Mood Check-in */}
-        <Card className="border border-black shadow-sm bg-white">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-black">
-              <Heart className="h-5 w-5" />
-              Mood Check-in
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MoodCheckIn onMoodUpdated={refreshData} />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Modules Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-white" onClick={() => onModuleClick('tasks')}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg text-black">
-              <CheckSquare className="h-5 w-5" />
-              Tasks
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600 mb-4">Manage your daily tasks and projects</p>
-            <Button variant="outline" size="sm" className="w-full border-black text-black hover:bg-black hover:text-white">
-              Open Tasks
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-white" onClick={() => onModuleClick('expenses')}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg text-black">
-              <DollarSign className="h-5 w-5" />
-              Expenses
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600 mb-4">Track your daily expenses</p>
-            <Button variant="outline" size="sm" className="w-full border-black text-black hover:bg-black hover:text-white">
-              Add Expense
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-white" onClick={() => onModuleClick('journal')}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg text-black">
-              <BookOpen className="h-5 w-5" />
-              Journal
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600 mb-4">Write your thoughts and reflections</p>
-            <Button variant="outline" size="sm" className="w-full border-black text-black hover:bg-black hover:text-white">
-              New Entry
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-white" onClick={() => onModuleClick('planner')}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg text-black">
-              <Calendar className="h-5 w-5" />
-              Planner
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600 mb-4">Plan your day and schedule</p>
-            <Button variant="outline" size="sm" className="w-full border-black text-black hover:bg-black hover:text-white">
-              Open Planner
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Relationship Care */}
-      <Card className="border border-black shadow-sm bg-white">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-black">
-            <Heart className="h-5 w-5" />
-            Relationship Care
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Stay connected with your loved ones</p>
-              <p className="text-xs text-gray-600 mt-1">AI-powered message suggestions</p>
-            </div>
-            <Button onClick={() => onModuleClick('relationship')} variant="outline" className="border-black text-black hover:bg-black hover:text-white">
-              Send Love
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      ))}
     </div>
   );
 };
