@@ -11,13 +11,6 @@ interface SweetMessage {
   is_ai_generated: boolean;
 }
 
-interface MoodCheckin {
-  id: string;
-  mood: string;
-  note: string;
-  date: string;
-}
-
 interface Reminder {
   id: string;
   title: string;
@@ -29,7 +22,6 @@ export const useRelationshipData = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [sweetMessages, setSweetMessages] = useState<SweetMessage[]>([]);
-  const [moodCheckins, setMoodCheckins] = useState<MoodCheckin[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,15 +41,6 @@ export const useRelationshipData = () => {
         .order('created_at', { ascending: false });
 
       if (messages) setSweetMessages(messages);
-
-      // Load mood checkins
-      const { data: moods } = await supabase
-        .from('mood_checkins')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('date', { ascending: false });
-
-      if (moods) setMoodCheckins(moods);
 
       // Load reminders
       const { data: reminderData } = await supabase
@@ -102,35 +85,6 @@ export const useRelationshipData = () => {
     }
   };
 
-  const addMoodCheckin = async (mood: string, note: string) => {
-    try {
-      const { error } = await supabase
-        .from('mood_checkins')
-        .insert({
-          user_id: user?.id,
-          mood,
-          note,
-          date: new Date().toISOString().split('T')[0]
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Mood Saved",
-        description: "Your mood check-in has been saved.",
-      });
-
-      loadData();
-    } catch (error) {
-      console.error('Error adding mood checkin:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save mood check-in.",
-        variant: "destructive",
-      });
-    }
-  };
-
   const addReminder = async (title: string, date: string, type: string) => {
     try {
       const { error } = await supabase
@@ -162,11 +116,9 @@ export const useRelationshipData = () => {
 
   return {
     sweetMessages,
-    moodCheckins,
     reminders,
     loading,
     addSweetMessage,
-    addMoodCheckin,
     addReminder
   };
 };

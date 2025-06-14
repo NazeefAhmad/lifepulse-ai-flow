@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Sparkles, Download, Upload, Bell, Users, Wifi, WifiOff, Zap } from 'lucide-react';
+import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Download, Upload, Bell, Users, Wifi, WifiOff, Zap, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,9 +9,7 @@ import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useTaskNotifications } from '@/hooks/useTaskNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import TaskFilters from './TaskFilters';
 import TypingIndicator from './TypingIndicator';
-import NoInternetScreen from './NoInternetScreen';
 import EmailAutocomplete from './EmailAutocomplete';
 
 interface Task {
@@ -36,7 +34,6 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { isConnected, createTaskEvent, importTasksFromCalendar, bulkExportTasks } = useGoogleCalendar();
-  const { preferences: notificationPrefs, updatePreferences } = useTaskNotifications();
   
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,12 +46,6 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
   const [syncToGoogle, setSyncToGoogle] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'in-progress' | 'completed'>('all');
-  const [filterPriority, setFilterPriority] = useState<'all' | 'low' | 'medium' | 'high'>('all');
-  
-  // New filter state
-  const [assigneeFilter, setAssigneeFilter] = useState('');
-  const [dueDateStart, setDueDateStart] = useState('');
-  const [dueDateEnd, setDueDateEnd] = useState('');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isTyping, setIsTyping] = useState(false);
 
@@ -109,58 +100,6 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
     }
   };
 
-  const handleImportFromCalendar = async () => {
-    try {
-      const importedTasks = await importTasksFromCalendar();
-      
-      if (importedTasks.length > 0) {
-        // Add imported tasks to database
-        const tasksToInsert = importedTasks.map(task => ({
-          ...task,
-          user_id: user?.id
-        }));
-
-        const { data, error } = await supabase
-          .from('tasks')
-          .insert(tasksToInsert)
-          .select();
-
-        if (error) throw error;
-
-        // Update local state
-        const newTasks: Task[] = (data || []).map(task => ({
-          ...task,
-          priority: task.priority as 'low' | 'medium' | 'high',
-          status: task.status as 'pending' | 'in-progress' | 'completed'
-        }));
-
-        setTasks([...newTasks, ...tasks]);
-      }
-    } catch (error) {
-      console.error('Error importing tasks:', error);
-      toast({
-        title: "Import Error",
-        description: "Failed to import tasks from Google Calendar.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleBulkExport = async () => {
-    const unSyncedTasks = tasks.filter(task => !task.google_event_id && task.status !== 'completed');
-    if (unSyncedTasks.length === 0) {
-      toast({
-        title: "No Tasks to Export",
-        description: "All tasks are already synced or completed.",
-      });
-      return;
-    }
-
-    await bulkExportTasks(unSyncedTasks);
-    // Refresh tasks to get updated google_event_ids
-    await loadTasks();
-  };
-
   const sendTaskAssignmentEmail = async (taskData: any) => {
     try {
       const { data, error } = await supabase.functions.invoke('send-task-assignment', {
@@ -192,7 +131,6 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
   };
 
   const splitTasksFromText = (text: string): string[] => {
-    // Split by common delimiters that indicate separate tasks
     const delimiters = ['\n', ';', ',', '|', '•', '-', '*'];
     let tasks = [text];
     
@@ -202,23 +140,13 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
       );
     });
     
-    // Filter out very short tasks (likely not meaningful)
     return tasks.filter(task => task.length > 2);
   };
 
   const handleTaskInput = (value: string) => {
     setNewTask(value);
-    
-    // Show typing indicator
     setIsTyping(true);
     setTimeout(() => setIsTyping(false), 1000);
-    
-    // Check if input contains multiple tasks
-    const potentialTasks = splitTasksFromText(value);
-    if (potentialTasks.length > 1) {
-      // Show preview of how many tasks will be created
-      console.log(`Will create ${potentialTasks.length} tasks:`, potentialTasks);
-    }
   };
 
   const addBulkTasks = async () => {
@@ -228,7 +156,6 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
       setLoading(true);
       
       const tasksToCreate = splitTasksFromText(newTask);
-      console.log('Creating bulk tasks:', tasksToCreate);
       
       if (tasksToCreate.length > 1) {
         toast({
@@ -284,7 +211,6 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
 
         createdTasks.push(newTaskData);
         
-        // Send assignment email if task is assigned to someone
         if (assignedToEmail) {
           await sendTaskAssignmentEmail({
             ...taskData,
@@ -296,7 +222,6 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
 
       setTasks([...createdTasks, ...tasks]);
       
-      // Reset form
       setNewTask('');
       setNewDescription('');
       setNewDueDate('');
@@ -386,43 +311,16 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
                          task.assigned_to_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          task.assigned_to_name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || task.status === filterStatus;
-    const matchesPriority = filterPriority === 'all' || task.priority === filterPriority;
-    const matchesAssignee = !assigneeFilter || 
-                           task.assigned_to_email?.toLowerCase().includes(assigneeFilter.toLowerCase()) ||
-                           task.assigned_to_name?.toLowerCase().includes(assigneeFilter.toLowerCase());
     
-    let matchesDateRange = true;
-    if (dueDateStart || dueDateEnd) {
-      const taskDate = task.due_date ? new Date(task.due_date) : null;
-      if (taskDate) {
-        const startDate = dueDateStart ? new Date(dueDateStart) : null;
-        const endDate = dueDateEnd ? new Date(dueDateEnd) : null;
-        
-        if (startDate && taskDate < startDate) matchesDateRange = false;
-        if (endDate && taskDate > endDate) matchesDateRange = false;
-      } else {
-        matchesDateRange = false; // Exclude tasks without due dates when date filter is active
-      }
-    }
-    
-    return matchesSearch && matchesStatus && matchesPriority && matchesAssignee && matchesDateRange;
+    return matchesSearch && matchesStatus;
   });
-
-  const clearAllFilters = () => {
-    setSearchTerm('');
-    setFilterStatus('all');
-    setFilterPriority('all');
-    setAssigneeFilter('');
-    setDueDateStart('');
-    setDueDateEnd('');
-  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'high': return 'bg-red-50 text-red-700 border-red-200';
+      case 'medium': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      case 'low': return 'bg-green-50 text-green-700 border-green-200';
+      default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
@@ -430,316 +328,221 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
     switch (status) {
       case 'completed': return <Check className="h-4 w-4 text-green-600" />;
       case 'in-progress': return <Clock className="h-4 w-4 text-blue-600" />;
-      default: return <AlertCircle className="h-4 w-4 text-gray-600" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-50 border-green-200';
-      case 'in-progress': return 'bg-blue-50 border-blue-200';
-      default: return 'bg-gray-50 border-gray-200';
+      default: return <AlertCircle className="h-4 w-4 text-gray-400" />;
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Simplified Header */}
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
+        {/* Simple Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              onClick={onBack} 
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
-            >
-              <ArrowLeft className="h-4 w-4" />
+            <Button variant="ghost" onClick={onBack} className="text-gray-600 hover:text-gray-900">
+              <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
-                  <Zap className="h-6 w-6 text-blue-600" />
-                  Task Manager
-                </h1>
-                {isTyping && <TypingIndicator />}
-              </div>
-              <p className="text-gray-600 text-sm mt-1">Organize and track your tasks efficiently</p>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-gray-900">Tasks</h1>
+              {isTyping && <TypingIndicator />}
             </div>
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Network status */}
-            <div className="flex items-center gap-2 text-sm">
-              {isOnline ? (
-                <Wifi className="h-4 w-4 text-green-600" />
-              ) : (
-                <WifiOff className="h-4 w-4 text-red-600" />
-              )}
-              <span className="text-gray-600">
-                {isOnline ? 'Online' : 'Offline'}
-              </span>
-            </div>
-            
             {isConnected && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleImportFromCalendar}
-                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Import
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBulkExport}
-                  className="text-green-600 border-green-200 hover:bg-green-50"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-              </>
-            )}
-            
-            {isConnected && (
-              <Badge variant="outline" className="text-green-700 border-green-200 bg-green-50">
+              <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50">
                 <Calendar className="h-3 w-3 mr-1" />
-                Connected
+                Synced
               </Badge>
             )}
           </div>
         </div>
 
-        {/* Simplified Add Task Card */}
-        <Card className="border border-gray-200 bg-white shadow-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-medium text-gray-900 flex items-center gap-2">
-              <Plus className="h-5 w-5 text-blue-600" />
-              Add New Task
-            </CardTitle>
-            <p className="text-sm text-gray-600">
-              💡 Tip: Separate multiple tasks with commas or new lines to create them all at once
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+        {/* Quick Add Task */}
+        <Card className="border-0 shadow-sm bg-white">
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              <div className="flex gap-3">
                 <Input
-                  placeholder="What needs to be done?"
+                  placeholder="What needs to be done? (separate multiple tasks with commas)"
                   value={newTask}
                   onChange={(e) => handleTaskInput(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && addBulkTasks()}
-                  className="font-medium bg-white border-gray-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                  className="text-lg font-medium bg-gray-50 border-0 focus:bg-white focus:ring-2 focus:ring-blue-500"
                 />
-                {splitTasksFromText(newTask).length > 1 && (
-                  <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-200">
-                    ✨ Will create {splitTasksFromText(newTask).length} tasks
-                  </div>
-                )}
+                <Button 
+                  onClick={addBulkTasks} 
+                  disabled={!newTask.trim() || loading}
+                  size="lg"
+                  className="bg-blue-600 hover:bg-blue-700 px-8"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add
+                </Button>
               </div>
-              <Input
-                placeholder="Description (optional)"
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                className="bg-white border-gray-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-              />
-            </div>
-            
-            {/* Enhanced Assignment Section */}
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <div className="flex items-center gap-2 mb-3">
-                <Users className="h-4 w-4 text-gray-600" />
-                <span className="font-medium text-gray-900">Assign Task (Optional)</span>
-              </div>
-              <EmailAutocomplete
-                emailValue={assignedToEmail}
-                nameValue={assignedToName}
-                onEmailChange={setAssignedToEmail}
-                onNameChange={setAssignedToName}
-                emailPlaceholder="Type email to see suggestions..."
-                namePlaceholder="Assignee name"
-              />
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-4">
-              <select
-                value={newPriority}
-                onChange={(e) => setNewPriority(e.target.value as 'low' | 'medium' | 'high')}
-                className="px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white text-sm"
-              >
-                <option value="low">🟢 Low Priority</option>
-                <option value="medium">🟡 Medium Priority</option>
-                <option value="high">🔴 High Priority</option>
-              </select>
-              
-              <Input
-                type="date"
-                value={newDueDate}
-                onChange={(e) => setNewDueDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                className="bg-white border-gray-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 w-auto"
-              />
-              
-              {isConnected && (
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={syncToGoogle}
-                    onChange={(e) => setSyncToGoogle(e.target.checked)}
-                    className="rounded text-blue-600 focus:ring-blue-500"
-                  />
-                  <Calendar className="h-4 w-4" />
-                  Sync to Calendar
-                </label>
-              )}
-              
-              <Button 
-                onClick={addBulkTasks} 
-                disabled={!newTask.trim() || loading}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                {splitTasksFromText(newTask).length > 1 
-                  ? `Create ${splitTasksFromText(newTask).length} Tasks` 
-                  : assignedToEmail ? 'Create & Assign' : 'Create Task'}
-              </Button>
-            </div>
 
-            {assignedToEmail && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
-                <Bell className="h-4 w-4 text-blue-600 mt-0.5" />
-                <div className="text-sm text-blue-800">
-                  <strong>{assignedToName || assignedToEmail}</strong> will receive an email notification
+              {/* Advanced Options - Collapsible */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-gray-100">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">Priority</label>
+                  <select
+                    value={newPriority}
+                    onChange={(e) => setNewPriority(e.target.value as 'low' | 'medium' | 'high')}
+                    className="w-full px-3 py-2 bg-gray-50 border-0 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="low">🟢 Low</option>
+                    <option value="medium">🟡 Medium</option>
+                    <option value="high">🔴 High</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">Due Date</label>
+                  <Input
+                    type="date"
+                    value={newDueDate}
+                    onChange={(e) => setNewDueDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="bg-gray-50 border-0 focus:bg-white focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">Assign To</label>
+                  <EmailAutocomplete
+                    emailValue={assignedToEmail}
+                    nameValue={assignedToName}
+                    onEmailChange={setAssignedToEmail}
+                    onNameChange={setAssignedToName}
+                    emailPlaceholder="Email address"
+                    namePlaceholder="Name"
+                  />
                 </div>
               </div>
-            )}
+
+              {splitTasksFromText(newTask).length > 1 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    ✨ Will create {splitTasksFromText(newTask).length} tasks
+                  </p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
-        {/* Simplified Filter Section */}
-        <TaskFilters
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          filterStatus={filterStatus}
-          onStatusChange={(value) => setFilterStatus(value as 'all' | 'pending' | 'in-progress' | 'completed')}
-          filterPriority={filterPriority}
-          onPriorityChange={(value) => setFilterPriority(value as 'all' | 'low' | 'medium' | 'high')}
-          assigneeFilter={assigneeFilter}
-          onAssigneeChange={setAssigneeFilter}
-          dueDateStart={dueDateStart}
-          onDueDateStartChange={setDueDateStart}
-          dueDateEnd={dueDateEnd}
-          onDueDateEndChange={setDueDateEnd}
-          filteredCount={filteredTasks.length}
-          totalCount={tasks.length}
-          onClearFilters={clearAllFilters}
-        />
-
-        {/* Simplified Tasks List */}
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <Card key={i} className="animate-pulse bg-white border border-gray-200">
-                <CardContent className="p-4">
-                  <div className="h-16 bg-gray-200 rounded"></div>
-                </CardContent>
-              </Card>
+        {/* Simple Filters */}
+        <div className="flex gap-4 items-center">
+          <div className="relative flex-1">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="Search tasks..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-white border-gray-200"
+            />
+          </div>
+          
+          <div className="flex gap-2">
+            {['all', 'pending', 'in-progress', 'completed'].map((status) => (
+              <Button
+                key={status}
+                variant={filterStatus === status ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilterStatus(status as any)}
+                className="capitalize"
+              >
+                {status === 'all' ? 'All' : status.replace('-', ' ')}
+              </Button>
             ))}
           </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredTasks.map((task) => (
-              <Card 
-                key={task.id} 
-                className={`transition-all bg-white border border-gray-200 hover:shadow-md ${
-                  task.status === 'completed' ? 'opacity-60' : ''
-                }`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 flex-1">
+        </div>
+
+        {/* Tasks List */}
+        <div className="space-y-3">
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <Card key={i} className="animate-pulse border-0 shadow-sm">
+                  <CardContent className="p-4">
+                    <div className="h-16 bg-gray-100 rounded"></div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <>
+              {filteredTasks.map((task) => (
+                <Card key={task.id} className="border-0 shadow-sm hover:shadow-md transition-shadow bg-white">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => toggleTaskStatus(task.id, task.status)}
-                        className="p-2 hover:bg-gray-50 rounded-full"
+                        className="p-2 hover:bg-gray-50 rounded-full flex-shrink-0"
                       >
                         {getStatusIcon(task.status)}
                       </Button>
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className={`font-medium ${task.status === 'completed' ? 'line-through text-gray-500' : 'text-gray-900'} truncate`}>
+                          <h3 className={`font-medium text-lg ${task.status === 'completed' ? 'line-through text-gray-500' : 'text-gray-900'}`}>
                             {task.title}
                           </h3>
                           {task.google_event_id && (
-                            <Calendar className="h-4 w-4 text-green-600 flex-shrink-0" />
-                          )}
-                          {task.assigned_to_email && (
-                            <div className="flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-full flex-shrink-0">
-                              <Users className="h-3 w-3 text-blue-600" />
-                              <span className="text-xs text-blue-700 truncate max-w-24">
-                                {task.assigned_to_name || task.assigned_to_email}
-                              </span>
-                            </div>
+                            <Calendar className="h-4 w-4 text-green-600" />
                           )}
                         </div>
                         
-                        {task.description && (
-                          <p className="text-sm text-gray-600 mb-2 line-clamp-2">{task.description}</p>
-                        )}
-                        
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <div className="flex items-center gap-3 text-sm text-gray-500">
                           {task.due_date && (
                             <span>📅 {new Date(task.due_date).toLocaleDateString()}</span>
                           )}
-                          {task.due_date && <span>•</span>}
-                          <span>Created {new Date(task.created_at).toLocaleDateString()}</span>
+                          {task.assigned_to_email && (
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {task.assigned_to_name || task.assigned_to_email}
+                            </span>
+                          )}
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Badge variant="outline" className={`text-xs ${getPriorityColor(task.priority)}`}>
-                          {task.priority === 'high' ? '🔴' : task.priority === 'medium' ? '🟡' : '🟢'} {task.priority}
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <Badge variant="outline" className={`${getPriorityColor(task.priority)}`}>
+                          {task.priority}
                         </Badge>
                         
-                        <Badge variant="outline" className="capitalize text-xs">
-                          {task.status.replace('-', ' ')}
-                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteTask(task.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteTask(task.id)}
-                      className="text-red-600 hover:text-red-800 hover:bg-red-50 ml-2 flex-shrink-0"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            
-            {filteredTasks.length === 0 && !loading && (
-              <Card className="border-2 border-dashed border-gray-200 bg-gray-50">
-                <CardContent className="p-8 text-center">
-                  <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-600 mb-2">No tasks found</h3>
-                  <p className="text-gray-500">
-                    {searchTerm || filterStatus !== 'all' || filterPriority !== 'all' 
-                      ? "Try adjusting your filters or search term." 
-                      : "Create your first task to get started! ✨"}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
+                  </CardContent>
+                </Card>
+              ))}
+              
+              {filteredTasks.length === 0 && (
+                <Card className="border-2 border-dashed border-gray-200 bg-gray-50">
+                  <CardContent className="p-12 text-center">
+                    <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-medium text-gray-600 mb-2">No tasks found</h3>
+                    <p className="text-gray-500">
+                      {searchTerm || filterStatus !== 'all' 
+                        ? "Try adjusting your search or filters." 
+                        : "Create your first task to get started! ✨"}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
