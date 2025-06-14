@@ -70,16 +70,21 @@ const Dashboard = () => {
 
     if (activeView === 'calendar') {
       return (
-        <div className="min-h-screen bg-white p-6">
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
           <div className="max-w-6xl mx-auto space-y-6">
             <div className="flex items-center gap-4">
-              <Button variant="outline" onClick={() => setActiveView('dashboard')} size={isMobile ? "sm" : "default"} className="border-black text-black hover:bg-black hover:text-white">
+              <Button 
+                variant="outline" 
+                onClick={() => setActiveView('dashboard')} 
+                size={isMobile ? "sm" : "default"} 
+                className="border-2 border-blue-200 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded-xl shadow-sm"
+              >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Back to Dashboard</span>
                 <span className="sm:hidden">Back</span>
               </Button>
-              <h1 className="text-3xl font-bold text-black">
-                {isMobile ? 'Calendar' : 'Google Calendar Integration'}
+              <h1 className="text-3xl font-bold text-gray-800">
+                {isMobile ? 'Calendar' : 'Your Calendar Connection'}
               </h1>
             </div>
             <GoogleCalendarIntegration />
@@ -94,26 +99,26 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="container mx-auto px-6 py-8 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-6 p-6 bg-white rounded-lg border border-black shadow-sm">
-            <div className="flex items-center gap-4 flex-1 min-w-0">
-              <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
-                <span className="text-white font-bold text-lg">L</span>
+          <div className="flex items-center justify-between mb-6 p-8 bg-white/70 backdrop-blur-sm rounded-3xl border border-blue-100 shadow-lg">
+            <div className="flex items-center gap-6 flex-1 min-w-0">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
+                <span className="text-white font-bold text-2xl">✨</span>
               </div>
               <div className="min-w-0 flex-1">
-                <h1 className="text-3xl font-bold text-black">
-                  Welcome back, {user?.email?.split('@')[0] || 'User'}!
+                <h1 className="text-4xl font-bold text-gray-800 mb-2">
+                  Welcome back, {user?.email?.split('@')[0] || 'Friend'}! 🌟
                 </h1>
-                <p className="text-gray-600 mt-1">
-                  Your personal dashboard
+                <p className="text-gray-600 text-lg">
+                  Hope you're having a wonderful day
                 </p>
               </div>
             </div>
             
-            <div className="flex items-center gap-4 flex-shrink-0">
+            <div className="flex items-center gap-6 flex-shrink-0">
               <NotificationSystem />
               
               <Button
@@ -121,21 +126,21 @@ const Dashboard = () => {
                 size="sm"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="border-black text-black hover:bg-black hover:text-white"
+                className="border-2 border-blue-200 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded-xl shadow-sm"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              <div className="text-center bg-gray-100 p-3 rounded-lg border border-black">
-                <p className="text-sm text-gray-600">
+              <div className="text-center bg-gradient-to-br from-green-100 to-emerald-100 p-4 rounded-2xl border-2 border-green-200 shadow-sm">
+                <p className="text-sm text-gray-600 mb-1">
                   {new Date().toLocaleDateString('en-US', { 
-                    weekday: 'short', 
-                    month: 'short', 
+                    weekday: 'long', 
+                    month: 'long', 
                     day: 'numeric' 
                   })}
                 </p>
-                <p className="text-xl font-bold text-black">
-                  Mood Score: {data?.moodScore || '7.5'}/10
+                <p className="text-xl font-bold text-gray-800">
+                  Mood: {data?.moodScore || '7.5'}/10 💚
                 </p>
               </div>
             </div>
