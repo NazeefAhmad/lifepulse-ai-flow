@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Calendar, Clock, Plus, MapPin, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -182,11 +183,11 @@ const DailyPlanner = ({ onBack }: DailyPlannerProps) => {
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'meeting': return 'bg-blue-100 text-blue-800';
-      case 'task': return 'bg-green-100 text-green-800';
-      case 'personal': return 'bg-purple-100 text-purple-800';
-      case 'break': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'meeting': return 'bg-gray-100 text-black border-black';
+      case 'task': return 'bg-gray-100 text-black border-black';
+      case 'personal': return 'bg-gray-100 text-black border-black';
+      case 'break': return 'bg-gray-100 text-black border-black';
+      default: return 'bg-gray-100 text-black border-black';
     }
   };
 
@@ -200,137 +201,151 @@ const DailyPlanner = ({ onBack }: DailyPlannerProps) => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Button>
-        <h1 className="text-2xl font-bold">Daily Planner</h1>
-      </div>
+    <div className="min-h-screen bg-white p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="outline" 
+            onClick={onBack}
+            className="border-black text-black hover:bg-black hover:text-white"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <h1 className="text-3xl font-bold text-black">Daily Planner</h1>
+        </div>
 
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50">
-        <CardContent className="p-6">
-          <div className="flex items-center gap-2 text-lg font-semibold text-blue-800">
-            <Calendar className="h-5 w-5" />
-            {getCurrentDate()}
-          </div>
-          <p className="text-blue-600 mt-1">
-            You have {events.length} events scheduled today
-            {isConnected && " (synced with Google Calendar)"}
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Add New Event</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              placeholder="Event title"
-              value={newEvent.title}
-              onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-            />
-            <Input
-              type="time"
-              value={newEvent.time}
-              onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
-            />
-            <Input
-              placeholder="Duration (e.g., 1 hour)"
-              value={newEvent.duration}
-              onChange={(e) => setNewEvent({ ...newEvent, duration: e.target.value })}
-            />
-            <Input
-              placeholder="Location (optional)"
-              value={newEvent.location}
-              onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
-            />
-            <select
-              value={newEvent.type}
-              onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value as Event['type'] })}
-              className="px-3 py-2 border rounded-md"
-            >
-              <option value="task">Task</option>
-              <option value="meeting">Meeting</option>
-              <option value="personal">Personal</option>
-              <option value="break">Break</option>
-            </select>
-            <div className="flex items-center gap-2">
-              <Button onClick={addEvent} className="flex-1">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Event
-              </Button>
-              {isConnected && (
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={newEvent.syncToGoogle}
-                    onChange={(e) => setNewEvent({ ...newEvent, syncToGoogle: e.target.checked })}
-                    className="rounded"
-                  />
-                  Sync to Google
-                </label>
-              )}
+        <Card className="bg-white border-black shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 text-lg font-semibold text-black">
+              <Calendar className="h-5 w-5" />
+              {getCurrentDate()}
             </div>
-          </div>
-        </CardContent>
-      </Card>
+            <p className="text-gray-600 mt-1">
+              You have {events.length} events scheduled today
+              {isConnected && " (synced with Google Calendar)"}
+            </p>
+          </CardContent>
+        </Card>
 
-      <div className="space-y-3">
-        {events.map((event) => (
-          <Card key={event.id} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-                    <Clock className="h-4 w-4" />
-                    {event.time}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium">{event.title}</h3>
-                      {event.isGoogleEvent && (
-                        <Badge variant="outline" className="text-xs">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          Google
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      {event.duration && <span>Duration: {event.duration}</span>}
-                      {event.location && (
-                        <>
-                          <span>•</span>
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {event.location}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge className={getTypeColor(event.type)}>
-                    {event.type}
-                  </Badge>
-                  {event.isGoogleEvent && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => window.open(`https://calendar.google.com/calendar/event?eid=${event.googleEventId}`, '_blank')}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+        <Card className="bg-white border-black shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-black">Add New Event</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                placeholder="Event title"
+                value={newEvent.title}
+                onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                className="border-black focus:ring-black"
+              />
+              <Input
+                type="time"
+                value={newEvent.time}
+                onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                className="border-black focus:ring-black"
+              />
+              <Input
+                placeholder="Duration (e.g., 1 hour)"
+                value={newEvent.duration}
+                onChange={(e) => setNewEvent({ ...newEvent, duration: e.target.value })}
+                className="border-black focus:ring-black"
+              />
+              <Input
+                placeholder="Location (optional)"
+                value={newEvent.location}
+                onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                className="border-black focus:ring-black"
+              />
+              <select
+                value={newEvent.type}
+                onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value as Event['type'] })}
+                className="px-3 py-2 border border-black rounded-md focus:outline-none focus:ring-2 focus:ring-black bg-white text-black"
+              >
+                <option value="task">Task</option>
+                <option value="meeting">Meeting</option>
+                <option value="personal">Personal</option>
+                <option value="break">Break</option>
+              </select>
+              <div className="flex items-center gap-2">
+                <Button 
+                  onClick={addEvent} 
+                  className="flex-1 bg-black text-white hover:bg-gray-800"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Event
+                </Button>
+                {isConnected && (
+                  <label className="flex items-center gap-2 text-sm text-black">
+                    <input
+                      type="checkbox"
+                      checked={newEvent.syncToGoogle}
+                      onChange={(e) => setNewEvent({ ...newEvent, syncToGoogle: e.target.checked })}
+                      className="rounded border-black focus:ring-black"
+                    />
+                    Sync to Google
+                  </label>
+                )}
               </div>
-            </CardContent>
-          </Card>
-        ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-3">
+          {events.map((event) => (
+            <Card key={event.id} className="bg-white border-black shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-lg font-semibold text-black">
+                      <Clock className="h-4 w-4" />
+                      {event.time}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-black">{event.title}</h3>
+                        {event.isGoogleEvent && (
+                          <Badge variant="outline" className="text-xs border-black text-black">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            Google
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        {event.duration && <span>Duration: {event.duration}</span>}
+                        {event.location && (
+                          <>
+                            <span>•</span>
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {event.location}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className={getTypeColor(event.type)}>
+                      {event.type}
+                    </Badge>
+                    {event.isGoogleEvent && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => window.open(`https://calendar.google.com/calendar/event?eid=${event.googleEventId}`, '_blank')}
+                        className="text-black hover:bg-gray-100"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   );
