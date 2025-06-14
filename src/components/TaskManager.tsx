@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Mail, Sparkles, Download, Upload, Bell, Users, Wifi, WifiOff } from 'lucide-react';
+import { ArrowLeft, Plus, Check, Clock, AlertCircle, Trash2, Calendar, Sparkles, Download, Upload, Bell, Users, Wifi, WifiOff, Zap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import TaskFilters from './TaskFilters';
 import TypingIndicator from './TypingIndicator';
 import NoInternetScreen from './NoInternetScreen';
+import EmailAutocomplete from './EmailAutocomplete';
 
 interface Task {
   id: string;
@@ -71,11 +71,6 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-
-  // Show no internet screen if offline
-  if (!isOnline) {
-    return <NoInternetScreen onRetry={() => window.location.reload()} />;
-  }
 
   useEffect(() => {
     if (user) {
@@ -237,7 +232,7 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
       
       if (tasksToCreate.length > 1) {
         toast({
-          title: `Creating ${tasksToCreate.length} tasks...`,
+          title: `✨ Creating ${tasksToCreate.length} tasks...`,
           description: "Processing your bulk task creation",
         });
       }
@@ -309,14 +304,14 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
       setAssignedToName('');
       
       toast({
-        title: `${createdTasks.length} Task${createdTasks.length > 1 ? 's' : ''} Added! ✨`,
-        description: hasGoogleSync ? "Tasks added and synced to Google Calendar." : "Tasks added successfully.",
+        title: `🎉 ${createdTasks.length} Task${createdTasks.length > 1 ? 's' : ''} Created!`,
+        description: hasGoogleSync ? "Tasks created and synced to Google Calendar." : "Tasks created successfully.",
       });
     } catch (error) {
       console.error('Error adding tasks:', error);
       toast({
-        title: "Error",
-        description: "Failed to add tasks. Please try again.",
+        title: "❌ Error",
+        description: "Failed to create tasks. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -448,146 +443,132 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
   };
 
   return (
-    <div className="space-y-6 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen p-6">
-      {/* Header with typing indicator */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="outline" 
-            onClick={onBack} 
-            className="flex items-center gap-2 bg-white/80 backdrop-blur-sm hover:bg-white/90 border-2 border-blue-200"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
-                <Sparkles className="h-8 w-8 text-purple-600" />
-                Smart Task Manager
-              </h1>
-              {isTyping && <TypingIndicator />}
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        {/* Simplified Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              onClick={onBack} 
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
+                  <Zap className="h-6 w-6 text-blue-600" />
+                  Task Manager
+                </h1>
+                {isTyping && <TypingIndicator />}
+              </div>
+              <p className="text-gray-600 text-sm mt-1">Organize and track your tasks efficiently</p>
             </div>
-            <p className="text-gray-600 mt-1">Organize, assign, and track your tasks with AI assistance</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          {/* Network status indicator */}
-          <div className="flex items-center gap-2">
-            {isOnline ? (
-              <Wifi className="h-4 w-4 text-green-600" />
-            ) : (
-              <WifiOff className="h-4 w-4 text-red-600" />
-            )}
-            <span className="text-sm text-gray-600">
-              {isOnline ? 'Online' : 'Offline'}
-            </span>
           </div>
           
-          {isConnected && (
-            <>
-              <Button
-                variant="outline"
-                onClick={handleImportFromCalendar}
-                className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Import from Calendar
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleBulkExport}
-                className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Export to Calendar
-              </Button>
-            </>
-          )}
-          
-          {notificationPrefs && (
-            <div className="flex items-center gap-2 bg-white/80 px-3 py-2 rounded-lg border border-purple-200">
-              <Bell className="h-4 w-4 text-purple-600" />
-              <span className="text-sm text-purple-700">
-                Reminders: {notificationPrefs.task_reminders_enabled ? 'On' : 'Off'}
+          <div className="flex items-center gap-3">
+            {/* Network status */}
+            <div className="flex items-center gap-2 text-sm">
+              {isOnline ? (
+                <Wifi className="h-4 w-4 text-green-600" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-red-600" />
+              )}
+              <span className="text-gray-600">
+                {isOnline ? 'Online' : 'Offline'}
               </span>
             </div>
-          )}
-          
-          {isConnected && (
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-4 py-2">
-              <Calendar className="h-3 w-3 mr-1" />
-              Calendar Connected
-            </Badge>
-          )}
+            
+            {isConnected && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleImportFromCalendar}
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Import
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBulkExport}
+                  className="text-green-600 border-green-200 hover:bg-green-50"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+              </>
+            )}
+            
+            {isConnected && (
+              <Badge variant="outline" className="text-green-700 border-green-200 bg-green-50">
+                <Calendar className="h-3 w-3 mr-1" />
+                Connected
+              </Badge>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Enhanced Add Task Card with bulk creation support */}
-      <Card className="border-2 border-dashed border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 shadow-lg">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-xl text-purple-800 flex items-center gap-2">
-            <Plus className="h-5 w-5" />
-            Create New Task(s)
-          </CardTitle>
-          <p className="text-sm text-purple-600">
-            💡 Tip: Paste multiple tasks separated by new lines, commas, or semicolons to create them all at once!
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        {/* Simplified Add Task Card */}
+        <Card className="border border-gray-200 bg-white shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-medium text-gray-900 flex items-center gap-2">
+              <Plus className="h-5 w-5 text-blue-600" />
+              Add New Task
+            </CardTitle>
+            <p className="text-sm text-gray-600">
+              💡 Tip: Separate multiple tasks with commas or new lines to create them all at once
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Input
-                  placeholder="What needs to be done? ✨ (supports bulk creation)"
+                  placeholder="What needs to be done?"
                   value={newTask}
                   onChange={(e) => handleTaskInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && addBulkTasks()}
-                  className="font-medium bg-white/80 border-purple-200 focus:border-purple-400"
+                  onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && addBulkTasks()}
+                  className="font-medium bg-white border-gray-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
                 />
                 {splitTasksFromText(newTask).length > 1 && (
-                  <div className="text-xs text-purple-600 bg-purple-50 p-2 rounded border border-purple-200">
-                    Will create {splitTasksFromText(newTask).length} tasks
+                  <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-200">
+                    ✨ Will create {splitTasksFromText(newTask).length} tasks
                   </div>
                 )}
               </div>
               <Input
-                placeholder="Add description (optional)"
+                placeholder="Description (optional)"
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
-                className="bg-white/80 border-purple-200 focus:border-purple-400"
+                className="bg-white border-gray-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
               />
             </div>
             
-            {/* Assignment Section */}
-            <div className="bg-white/60 p-4 rounded-lg border border-blue-200">
+            {/* Enhanced Assignment Section */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <div className="flex items-center gap-2 mb-3">
-                <Users className="h-4 w-4 text-blue-600" />
-                <span className="font-semibold text-blue-800">Assign Task (Optional)</span>
+                <Users className="h-4 w-4 text-gray-600" />
+                <span className="font-medium text-gray-900">Assign Task (Optional)</span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input
-                  placeholder="Assignee email 📧"
-                  type="email"
-                  value={assignedToEmail}
-                  onChange={(e) => setAssignedToEmail(e.target.value)}
-                  className="bg-white border-blue-200 focus:border-blue-400"
-                />
-                <Input
-                  placeholder="Assignee name (optional)"
-                  value={assignedToName}
-                  onChange={(e) => setAssignedToName(e.target.value)}
-                  className="bg-white border-blue-200 focus:border-blue-400"
-                />
-              </div>
+              <EmailAutocomplete
+                emailValue={assignedToEmail}
+                nameValue={assignedToName}
+                onEmailChange={setAssignedToEmail}
+                onNameChange={setAssignedToName}
+                emailPlaceholder="Type email to see suggestions..."
+                namePlaceholder="Assignee name"
+              />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+            <div className="flex flex-wrap items-center gap-4">
               <select
                 value={newPriority}
                 onChange={(e) => setNewPriority(e.target.value as 'low' | 'medium' | 'high')}
-                className="px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                className="px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white text-sm"
               >
                 <option value="low">🟢 Low Priority</option>
                 <option value="medium">🟡 Medium Priority</option>
@@ -599,16 +580,16 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
                 value={newDueDate}
                 onChange={(e) => setNewDueDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
-                className="bg-white border-purple-200 focus:border-purple-400"
+                className="bg-white border-gray-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 w-auto"
               />
               
               {isConnected && (
-                <label className="flex items-center gap-2 text-sm text-purple-700">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
                   <input
                     type="checkbox"
                     checked={syncToGoogle}
                     onChange={(e) => setSyncToGoogle(e.target.checked)}
-                    className="rounded text-purple-600 focus:ring-purple-500"
+                    className="rounded text-blue-600 focus:ring-blue-500"
                   />
                   <Calendar className="h-4 w-4" />
                   Sync to Calendar
@@ -618,7 +599,7 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
               <Button 
                 onClick={addBulkTasks} 
                 disabled={!newTask.trim() || loading}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-2 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 {splitTasksFromText(newTask).length > 1 
@@ -628,136 +609,138 @@ const TaskManager = ({ onBack }: TaskManagerProps) => {
             </div>
 
             {assignedToEmail && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
-                <Mail className="h-4 w-4 text-blue-600" />
-                <span className="text-sm text-blue-800">
-                  <strong>{assignedToName || assignedToEmail}</strong> will receive an email notification about this task
-                </span>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+                <Bell className="h-4 w-4 text-blue-600 mt-0.5" />
+                <div className="text-sm text-blue-800">
+                  <strong>{assignedToName || assignedToEmail}</strong> will receive an email notification
+                </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Simplified Filter Section */}
+        <TaskFilters
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          filterStatus={filterStatus}
+          onStatusChange={(value) => setFilterStatus(value as 'all' | 'pending' | 'in-progress' | 'completed')}
+          filterPriority={filterPriority}
+          onPriorityChange={(value) => setFilterPriority(value as 'all' | 'low' | 'medium' | 'high')}
+          assigneeFilter={assigneeFilter}
+          onAssigneeChange={setAssigneeFilter}
+          dueDateStart={dueDateStart}
+          onDueDateStartChange={setDueDateStart}
+          dueDateEnd={dueDateEnd}
+          onDueDateEndChange={setDueDateEnd}
+          filteredCount={filteredTasks.length}
+          totalCount={tasks.length}
+          onClearFilters={clearAllFilters}
+        />
+
+        {/* Simplified Tasks List */}
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => (
+              <Card key={i} className="animate-pulse bg-white border border-gray-200">
+                <CardContent className="p-4">
+                  <div className="h-16 bg-gray-200 rounded"></div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Enhanced Filter Section */}
-      <TaskFilters
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        filterStatus={filterStatus}
-        onStatusChange={(value) => setFilterStatus(value as 'all' | 'pending' | 'in-progress' | 'completed')}
-        filterPriority={filterPriority}
-        onPriorityChange={(value) => setFilterPriority(value as 'all' | 'low' | 'medium' | 'high')}
-        assigneeFilter={assigneeFilter}
-        onAssigneeChange={setAssigneeFilter}
-        dueDateStart={dueDateStart}
-        onDueDateStartChange={setDueDateStart}
-        dueDateEnd={dueDateEnd}
-        onDueDateEndChange={setDueDateEnd}
-        filteredCount={filteredTasks.length}
-        totalCount={tasks.length}
-        onClearFilters={clearAllFilters}
-      />
-
-      {/* Tasks List - keep existing structure but enhance styling */}
-      {loading ? (
-        <div className="grid gap-4">
-          {[1, 2, 3].map(i => (
-            <Card key={i} className="animate-pulse bg-white/60">
-              <CardContent className="p-4">
-                <div className="h-16 bg-purple-200 rounded"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {filteredTasks.map((task) => (
-            <Card 
-              key={task.id} 
-              className={`transition-all border-2 bg-white/80 backdrop-blur-sm shadow-lg hover:shadow-xl ${getStatusColor(task.status)} ${
-                task.status === 'completed' ? 'opacity-75' : 'hover:shadow-md'
-              }`}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 flex-1">
+        ) : (
+          <div className="space-y-3">
+            {filteredTasks.map((task) => (
+              <Card 
+                key={task.id} 
+                className={`transition-all bg-white border border-gray-200 hover:shadow-md ${
+                  task.status === 'completed' ? 'opacity-60' : ''
+                }`}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleTaskStatus(task.id, task.status)}
+                        className="p-2 hover:bg-gray-50 rounded-full"
+                      >
+                        {getStatusIcon(task.status)}
+                      </Button>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className={`font-medium ${task.status === 'completed' ? 'line-through text-gray-500' : 'text-gray-900'} truncate`}>
+                            {task.title}
+                          </h3>
+                          {task.google_event_id && (
+                            <Calendar className="h-4 w-4 text-green-600 flex-shrink-0" />
+                          )}
+                          {task.assigned_to_email && (
+                            <div className="flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-full flex-shrink-0">
+                              <Users className="h-3 w-3 text-blue-600" />
+                              <span className="text-xs text-blue-700 truncate max-w-24">
+                                {task.assigned_to_name || task.assigned_to_email}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {task.description && (
+                          <p className="text-sm text-gray-600 mb-2 line-clamp-2">{task.description}</p>
+                        )}
+                        
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          {task.due_date && (
+                            <span>📅 {new Date(task.due_date).toLocaleDateString()}</span>
+                          )}
+                          {task.due_date && <span>•</span>}
+                          <span>Created {new Date(task.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge variant="outline" className={`text-xs ${getPriorityColor(task.priority)}`}>
+                          {task.priority === 'high' ? '🔴' : task.priority === 'medium' ? '🟡' : '🟢'} {task.priority}
+                        </Badge>
+                        
+                        <Badge variant="outline" className="capitalize text-xs">
+                          {task.status.replace('-', ' ')}
+                        </Badge>
+                      </div>
+                    </div>
+                    
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => toggleTaskStatus(task.id, task.status)}
-                      className="p-2 hover:bg-white/50 rounded-full"
+                      onClick={() => deleteTask(task.id)}
+                      className="text-red-600 hover:text-red-800 hover:bg-red-50 ml-2 flex-shrink-0"
                     >
-                      {getStatusIcon(task.status)}
+                      <Trash2 className="h-4 w-4" />
                     </Button>
-                    
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className={`font-semibold ${task.status === 'completed' ? 'line-through text-gray-500' : 'text-gray-800'}`}>
-                          {task.title}
-                        </h3>
-                        {task.google_event_id && (
-                          <Calendar className="h-4 w-4 text-green-600" />
-                        )}
-                        {task.assigned_to_email && (
-                          <div className="flex items-center gap-1 bg-blue-100 px-2 py-1 rounded-full">
-                            <Users className="h-3 w-3 text-blue-600" />
-                            <span className="text-xs text-blue-700">{task.assigned_to_name || task.assigned_to_email}</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {task.description && (
-                        <p className="text-sm text-gray-600 mb-2">{task.description}</p>
-                      )}
-                      
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        {task.due_date && (
-                          <span>📅 Due: {new Date(task.due_date).toLocaleDateString()}</span>
-                        )}
-                        <span>•</span>
-                        <span>Created: {new Date(task.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Badge className={getPriorityColor(task.priority)}>
-                        {task.priority === 'high' ? '🔴' : task.priority === 'medium' ? '🟡' : '🟢'} {task.priority}
-                      </Badge>
-                      
-                      <Badge variant="outline" className="capitalize">
-                        {task.status.replace('-', ' ')}
-                      </Badge>
-                    </div>
                   </div>
-                  
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deleteTask(task.id)}
-                    className="text-red-600 hover:text-red-800 hover:bg-red-50 ml-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          
-          {filteredTasks.length === 0 && !loading && (
-            <Card className="border-2 border-dashed border-purple-200 bg-white/60">
-              <CardContent className="p-8 text-center">
-                <AlertCircle className="h-12 w-12 text-purple-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-purple-600 mb-2">No tasks found</h3>
-                <p className="text-purple-500">
-                  {searchTerm || filterStatus !== 'all' || filterPriority !== 'all' 
-                    ? "Try adjusting your filters or search term." 
-                    : "Start by adding your first task! ✨"}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+                </CardContent>
+              </Card>
+            ))}
+            
+            {filteredTasks.length === 0 && !loading && (
+              <Card className="border-2 border-dashed border-gray-200 bg-gray-50">
+                <CardContent className="p-8 text-center">
+                  <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-600 mb-2">No tasks found</h3>
+                  <p className="text-gray-500">
+                    {searchTerm || filterStatus !== 'all' || filterPriority !== 'all' 
+                      ? "Try adjusting your filters or search term." 
+                      : "Create your first task to get started! ✨"}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
