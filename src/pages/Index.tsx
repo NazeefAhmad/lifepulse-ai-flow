@@ -18,13 +18,13 @@ const AppContent = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-gray-50">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg animate-pulse">
+          <div className="w-16 h-16 bg-gradient-to-br from-slate-600 to-slate-700 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm animate-pulse">
             <span className="text-white font-bold text-xl">✨</span>
           </div>
-          <p className="text-gray-700 text-lg">Getting things ready for you...</p>
-          <p className="text-gray-500 text-sm mt-2">Just a moment! 😊</p>
+          <p className="text-slate-700 text-lg">Getting things ready for you...</p>
+          <p className="text-slate-500 text-sm mt-2">Just a moment! 😊</p>
         </div>
       </div>
     );
@@ -53,7 +53,7 @@ const AppContent = () => {
 
   return (
     <PomodoroProvider>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-gray-50">
         <Navigation 
           activeModule={activeModule} 
           setActiveModule={setActiveModule}
