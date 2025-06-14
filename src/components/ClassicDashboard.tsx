@@ -37,53 +37,53 @@ const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
     <div className="space-y-8">
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="border shadow-sm hover:shadow-md transition-shadow">
+        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow bg-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Tasks Today</CardTitle>
-            <CheckSquare className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-600">Tasks Today</CardTitle>
+            <CheckSquare className="h-4 w-4 text-gray-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data?.tasksToday?.completed || 0}/{data?.tasksToday?.total || 0}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-black">{data?.tasksToday?.completed || 0}/{data?.tasksToday?.total || 0}</div>
+            <p className="text-xs text-gray-600">
               {data?.tasksToday?.total ? Math.round((data.tasksToday.completed / data.tasksToday.total) * 100) : 0}% completed
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border shadow-sm hover:shadow-md transition-shadow">
+        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow bg-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Focus Time</CardTitle>
-            <Timer className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-600">Focus Time</CardTitle>
+            <Timer className="h-4 w-4 text-gray-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{Math.floor(totalFocusTime / 60)}h {totalFocusTime % 60}m</div>
-            <p className="text-xs text-muted-foreground">Today's sessions: {sessionCount}</p>
+            <div className="text-2xl font-bold text-black">{Math.floor(totalFocusTime / 60)}h {totalFocusTime % 60}m</div>
+            <p className="text-xs text-gray-600">Today's sessions: {sessionCount}</p>
           </CardContent>
         </Card>
 
-        <Card className="border shadow-sm hover:shadow-md transition-shadow">
+        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow bg-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Live Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-600">Live Users</CardTitle>
+            <Users className="h-4 w-4 text-gray-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-black">
               {liveUsersLoading ? '...' : liveUsersCount.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">Online now</p>
+            <p className="text-xs text-gray-600">Online now</p>
           </CardContent>
         </Card>
 
-        <Card className="border shadow-sm hover:shadow-md transition-shadow">
+        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow bg-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Mood Score</CardTitle>
-            <Heart className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-600">Mood Score</CardTitle>
+            <Heart className="h-4 w-4 text-gray-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-black">
               {data?.moodScore || '7.5'}/10
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-gray-600">
               Recent average
             </p>
           </CardContent>
@@ -93,18 +93,18 @@ const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Focus Timer */}
-        <Card className="lg:col-span-2 border shadow-sm">
+        <Card className="lg:col-span-2 border border-black shadow-sm bg-white">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Timer className="h-6 w-6" />
+                <Timer className="h-6 w-6 text-black" />
                 <div>
-                  <CardTitle>Focus Timer</CardTitle>
-                  <p className="text-sm text-muted-foreground">Pomodoro technique</p>
+                  <CardTitle className="text-black">Focus Timer</CardTitle>
+                  <p className="text-sm text-gray-600">Pomodoro technique</p>
                 </div>
               </div>
               {isActive && (
-                <Badge variant={isPaused ? "secondary" : "default"}>
+                <Badge variant={isPaused ? "secondary" : "default"} className={isPaused ? "bg-gray-200 text-black" : "bg-black text-white"}>
                   {isPaused ? 'Paused' : 'Active'}
                 </Badge>
               )}
@@ -112,12 +112,12 @@ const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="text-center">
-              <div className="text-6xl font-mono font-bold mb-4">
+              <div className="text-6xl font-mono font-bold mb-4 text-black">
                 {formatTime(timeLeft)}
               </div>
               <div className="space-y-2">
                 <Progress value={progress} className="h-2" />
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-gray-600">
                   {currentSession === 'focus' ? 'Focus Session' : 'Break Time'} #{sessionCount + 1}
                 </p>
               </div>
@@ -125,17 +125,17 @@ const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
             
             <div className="flex justify-center gap-3">
               {!isActive ? (
-                <Button onClick={startTimer} className="px-8">
+                <Button onClick={startTimer} className="px-8 bg-black text-white hover:bg-gray-800">
                   <Play className="h-4 w-4 mr-2" />
                   Start Focus
                 </Button>
               ) : (
                 <>
-                  <Button onClick={pauseTimer} variant="outline">
+                  <Button onClick={pauseTimer} variant="outline" className="border-black text-black hover:bg-black hover:text-white">
                     <Pause className="h-4 w-4 mr-2" />
                     {isPaused ? 'Resume' : 'Pause'}
                   </Button>
-                  <Button onClick={stopTimer} variant="destructive">
+                  <Button onClick={stopTimer} variant="destructive" className="bg-red-600 text-white hover:bg-red-700">
                     <RotateCcw className="h-4 w-4 mr-2" />
                     Reset
                   </Button>
@@ -146,7 +146,7 @@ const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
             <Button 
               onClick={() => onModuleClick('focus')} 
               variant="outline" 
-              className="w-full"
+              className="w-full border-black text-black hover:bg-black hover:text-white"
             >
               Advanced Focus Settings
             </Button>
@@ -154,9 +154,9 @@ const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
         </Card>
 
         {/* Mood Check-in */}
-        <Card className="border shadow-sm">
+        <Card className="border border-black shadow-sm bg-white">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-black">
               <Heart className="h-5 w-5" />
               Mood Check-in
             </CardTitle>
@@ -169,61 +169,61 @@ const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
 
       {/* Modules Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => onModuleClick('tasks')}>
+        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-white" onClick={() => onModuleClick('tasks')}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle className="flex items-center gap-2 text-lg text-black">
               <CheckSquare className="h-5 w-5" />
               Tasks
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">Manage your daily tasks and projects</p>
-            <Button variant="outline" size="sm" className="w-full">
+            <p className="text-sm text-gray-600 mb-4">Manage your daily tasks and projects</p>
+            <Button variant="outline" size="sm" className="w-full border-black text-black hover:bg-black hover:text-white">
               Open Tasks
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="border shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => onModuleClick('expenses')}>
+        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-white" onClick={() => onModuleClick('expenses')}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle className="flex items-center gap-2 text-lg text-black">
               <DollarSign className="h-5 w-5" />
               Expenses
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">Track your daily expenses</p>
-            <Button variant="outline" size="sm" className="w-full">
+            <p className="text-sm text-gray-600 mb-4">Track your daily expenses</p>
+            <Button variant="outline" size="sm" className="w-full border-black text-black hover:bg-black hover:text-white">
               Add Expense
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="border shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => onModuleClick('journal')}>
+        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-white" onClick={() => onModuleClick('journal')}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle className="flex items-center gap-2 text-lg text-black">
               <BookOpen className="h-5 w-5" />
               Journal
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">Write your thoughts and reflections</p>
-            <Button variant="outline" size="sm" className="w-full">
+            <p className="text-sm text-gray-600 mb-4">Write your thoughts and reflections</p>
+            <Button variant="outline" size="sm" className="w-full border-black text-black hover:bg-black hover:text-white">
               New Entry
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="border shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => onModuleClick('planner')}>
+        <Card className="border border-black shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-white" onClick={() => onModuleClick('planner')}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle className="flex items-center gap-2 text-lg text-black">
               <Calendar className="h-5 w-5" />
               Planner
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">Plan your day and schedule</p>
-            <Button variant="outline" size="sm" className="w-full">
+            <p className="text-sm text-gray-600 mb-4">Plan your day and schedule</p>
+            <Button variant="outline" size="sm" className="w-full border-black text-black hover:bg-black hover:text-white">
               Open Planner
             </Button>
           </CardContent>
@@ -231,9 +231,9 @@ const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
       </div>
 
       {/* Relationship Care */}
-      <Card className="border shadow-sm">
+      <Card className="border border-black shadow-sm bg-white">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-black">
             <Heart className="h-5 w-5" />
             Relationship Care
           </CardTitle>
@@ -241,10 +241,10 @@ const ClassicDashboard = ({ onModuleClick }: ClassicDashboardProps) => {
         <CardContent>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Stay connected with your loved ones</p>
-              <p className="text-xs text-muted-foreground mt-1">AI-powered message suggestions</p>
+              <p className="text-sm text-gray-600">Stay connected with your loved ones</p>
+              <p className="text-xs text-gray-600 mt-1">AI-powered message suggestions</p>
             </div>
-            <Button onClick={() => onModuleClick('relationship')} variant="outline">
+            <Button onClick={() => onModuleClick('relationship')} variant="outline" className="border-black text-black hover:bg-black hover:text-white">
               Send Love
             </Button>
           </div>
