@@ -9,22 +9,20 @@ import ExpenseLogger from '@/components/ExpenseLogger';
 import RelationshipCare from '@/components/RelationshipCare';
 import AuthPage from '@/components/AuthPage';
 import Dashboard from '@/components/Dashboard';
-import Navigation from '@/components/Navigation';
+import NotionSidebar from '@/components/NotionSidebar';
 import FloatingPomodoroWidget from '@/components/FloatingPomodoroWidget';
 
 const AppContent = () => {
   const { user, loading } = useAuth();
   const [activeModule, setActiveModule] = useState('dashboard');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-gray-50">
+      <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-slate-600 to-slate-700 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm animate-pulse">
-            <span className="text-white font-bold text-xl">✨</span>
-          </div>
-          <p className="text-slate-700 text-lg">Getting things ready for you...</p>
-          <p className="text-slate-500 text-sm mt-2">Just a moment! 😊</p>
+          <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 text-sm">Loading...</p>
         </div>
       </div>
     );
@@ -47,23 +45,26 @@ const AppContent = () => {
       case 'relationship':
         return <RelationshipCare onBack={() => setActiveModule('dashboard')} />;
       default:
-        return <Dashboard />;
+        return <Dashboard onModuleClick={setActiveModule} />;
     }
   };
 
   return (
     <PomodoroProvider>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-gray-50">
-        <Navigation 
-          activeModule={activeModule} 
+      <div className="flex h-screen bg-white">
+        <NotionSidebar 
+          activeModule={activeModule}
           setActiveModule={setActiveModule}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
         
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {renderActiveModule()}
+        <main className={`flex-1 flex flex-col transition-all duration-200 ${sidebarCollapsed ? 'ml-12' : 'ml-60'}`}>
+          <div className="flex-1 overflow-auto">
+            {renderActiveModule()}
+          </div>
         </main>
 
-        {/* Floating Pomodoro Widget */}
         <FloatingPomodoroWidget />
       </div>
     </PomodoroProvider>
