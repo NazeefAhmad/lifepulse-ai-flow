@@ -33,7 +33,7 @@ interface DailyPlannerManagerProps {
 const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { isConnected, createDailyPlannerEvent } = useGoogleCalendar();
+  const { isConnected, createDailyPlannerEvent, isSyncing, bulkExportTasks } = useGoogleCalendar();
   
   const [events, setEvents] = useState<DailyEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -273,6 +273,82 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
     }
   };
 
+  const bulkSyncToGoogle = async () => {
+    if (!isConnected) {
+      toast({
+        title: "Not Connected",
+        description: "Please connect to Google Calendar first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const eventsToSync = events.filter(event => !event.google_event_id);
+    
+    if (eventsToSync.length === 0) {
+      toast({
+        title: "All Synced!",
+        description: "All events are already synced with Google Calendar.",
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      toast({
+        title: `Syncing ${eventsToSync.length} Events...`,
+        description: "Uploading events to Google Calendar",
+      });
+
+      let syncedCount = 0;
+      for (const event of eventsToSync) {
+        try {
+          const googleEvent = await createDailyPlannerEvent({
+            title: event.title,
+            description: event.description,
+            startTime: event.start_time,
+            duration: event.duration_minutes,
+            date: event.date,
+            location: event.location
+          });
+
+          if (googleEvent) {
+            // Update the database with Google Event ID
+            const { error } = await supabase
+              .from('daily_events')
+              .update({ google_event_id: googleEvent.id })
+              .eq('id', event.id);
+
+            if (!error) {
+              syncedCount++;
+              // Update local state
+              setEvents(prev => prev.map(e => 
+                e.id === event.id ? { ...e, google_event_id: googleEvent.id } : e
+              ));
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to sync event ${event.title}:`, error);
+        }
+      }
+
+      toast({
+        title: `Sync Complete! 🎉`,
+        description: `Successfully synced ${syncedCount} of ${eventsToSync.length} events to Google Calendar.`,
+      });
+    } catch (error) {
+      console.error('Error during bulk sync:', error);
+      toast({
+        title: "Sync Failed",
+        description: "Failed to sync events to Google Calendar.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getEventTypeColor = (type: string) => {
     switch (type) {
       case 'meeting': return 'bg-blue-100 text-blue-800 border-blue-200';
@@ -335,12 +411,27 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
           </div>
         </div>
         
-        {isConnected && (
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-            <Calendar className="h-3 w-3 mr-1" />
-            Google Calendar Connected
-          </Badge>
-        )}
+        <div className="flex items-center gap-3">
+          {isConnected && (
+            <>
+              <Badge variant="outline" className={`${isSyncing ? 'animate-pulse bg-blue-100 text-blue-800' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                <Calendar className="h-3 w-3 mr-1" />
+                {isSyncing ? 'Syncing...' : 'Google Calendar Connected'}
+              </Badge>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={bulkSyncToGoogle}
+                disabled={loading || isSyncing}
+                className="border-blue-200 text-blue-700 hover:bg-blue-50"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                {isSyncing ? 'Syncing...' : `Sync All to Google (${events.filter(e => !e.google_event_id).length})`}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
@@ -353,6 +444,12 @@ const DailyPlannerManager = ({ onBack }: DailyPlannerManagerProps) => {
         <Badge variant="outline">
           {events.length} event{events.length !== 1 ? 's' : ''} scheduled
         </Badge>
+        {isConnected && (
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            <Calendar className="h-3 w-3 mr-1" />
+            {events.filter(e => e.google_event_id).length} synced to Google
+          </Badge>
+        )}
         <div className="flex items-center gap-2">
           <Badge className="bg-gray-100 text-gray-800 border-gray-200">
             Todo: {events.filter(e => (e.status || 'todo') === 'todo').length}
