@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { PomodoroProvider } from '@/contexts/PomodoroContext';
 import TaskManager from '@/components/TaskManager';
-import DailyPlanner from '@/components/DailyPlanner';
+import DailyPlannerManager from '@/components/DailyPlannerManager';
 import MicroJournal from '@/components/MicroJournal';
 import ExpenseLogger from '@/components/ExpenseLogger';
 import RelationshipCare from '@/components/RelationshipCare';
@@ -37,7 +37,7 @@ const AppContent = () => {
       case 'tasks':
         return <TaskManager onBack={() => setActiveModule('dashboard')} />;
       case 'planner':
-        return <DailyPlanner onBack={() => setActiveModule('dashboard')} />;
+        return <DailyPlannerManager onBack={() => setActiveModule('dashboard')} />;
       case 'journal':
         return <MicroJournal onBack={() => setActiveModule('dashboard')} />;
       case 'expenses':
