@@ -29,6 +29,8 @@ export const useGoogleCalendar = () => {
   const [credentialsSet, setCredentialsSet] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [tokenExpiry, setTokenExpiry] = useState<number | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const { toast } = useToast();
 
   // Load saved token on mount
@@ -50,7 +52,7 @@ export const useGoogleCalendar = () => {
     }
   }, []);
 
-  // Auto-refresh token before expiry
+  // Auto-refresh token before expiry and set up real-time sync
   useEffect(() => {
     if (tokenExpiry && accessToken) {
       const timeUntilExpiry = tokenExpiry - Date.now();
@@ -63,6 +65,20 @@ export const useGoogleCalendar = () => {
       return () => clearTimeout(refreshTimer);
     }
   }, [tokenExpiry, accessToken]);
+
+  // Set up real-time sync interval when connected
+  useEffect(() => {
+    if (isConnected && accessToken) {
+      const syncInterval = setInterval(() => {
+        syncCalendarEvents();
+      }, 30000); // Sync every 30 seconds
+
+      // Initial sync
+      syncCalendarEvents();
+
+      return () => clearInterval(syncInterval);
+    }
+  }, [isConnected, accessToken]);
 
   const saveToken = (token: string, expiresIn: number) => {
     const expiryTime = Date.now() + (expiresIn * 1000);
@@ -424,6 +440,132 @@ export const useGoogleCalendar = () => {
     }
   };
 
+  const syncCalendarEvents = async () => {
+    if (!isConnected || !accessToken || isSyncing) return;
+
+    setIsSyncing(true);
+    try {
+      const events = await getUpcomingEvents(50);
+      
+      // Filter LifeSync created events
+      const lifeSyncEvents = events.filter((event: any) => 
+        event.description?.includes('Created by LifeSync') ||
+        event.summary?.includes('📋') ||
+        event.summary?.includes('💕') ||
+        event.summary?.includes('📅')
+      );
+
+      // Sync with Supabase database
+      for (const event of lifeSyncEvents) {
+        if (event.summary?.includes('📋')) {
+          // Handle task sync
+          await syncTaskEvent(event);
+        } else if (event.summary?.includes('💕')) {
+          // Handle relationship reminder sync
+          await syncReminderEvent(event);
+        } else if (event.summary?.includes('📅')) {
+          // Handle daily planner sync
+          await syncDailyPlannerEvent(event);
+        }
+      }
+
+      setLastSyncTime(new Date());
+    } catch (error) {
+      console.error('Error syncing calendar events:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const syncTaskEvent = async (event: any) => {
+    try {
+      const { data: existingTask } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('google_event_id', event.id)
+        .single();
+
+      if (!existingTask) return;
+
+      // Check if event was modified in Google Calendar
+      const eventUpdated = new Date(event.updated);
+      const taskUpdated = new Date(existingTask.updated_at);
+
+      if (eventUpdated > taskUpdated) {
+        // Update task based on calendar event changes
+        const { error } = await supabase
+          .from('tasks')
+          .update({
+            title: event.summary?.replace('📋 ', '').replace(' #task', '') || existingTask.title,
+            updated_at: new Date().toISOString()
+          })
+          .eq('google_event_id', event.id);
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error syncing task event:', error);
+    }
+  };
+
+  const syncReminderEvent = async (event: any) => {
+    try {
+      const { data: existingReminder } = await supabase
+        .from('relationship_reminders')
+        .select('*')
+        .eq('title', event.summary?.replace('💕 ', ''))
+        .single();
+
+      if (existingReminder) return;
+
+      // Create new reminder if it doesn't exist and was created externally
+      if (!event.description?.includes('Created by LifeSync')) {
+        const { error } = await supabase
+          .from('relationship_reminders')
+          .insert({
+            title: event.summary?.replace('💕 ', '') || 'Imported Reminder',
+            date: event.start?.date || event.start?.dateTime?.split('T')[0],
+            type: 'imported',
+            user_id: (await supabase.auth.getUser()).data.user?.id
+          });
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error syncing reminder event:', error);
+    }
+  };
+
+  const syncDailyPlannerEvent = async (event: any) => {
+    try {
+      const { data: existingEvent } = await supabase
+        .from('daily_events')
+        .select('*')
+        .eq('google_event_id', event.id)
+        .single();
+
+      if (!existingEvent) return;
+
+      const eventUpdated = new Date(event.updated);
+      const dbEventUpdated = new Date(existingEvent.created_at);
+
+      if (eventUpdated > dbEventUpdated) {
+        const { error } = await supabase
+          .from('daily_events')
+          .update({
+            title: event.summary?.replace('📅 ', '') || existingEvent.title,
+            description: event.description?.replace('\n\nCreated by LifeSync Daily Planner', '') || existingEvent.description,
+            location: event.location || existingEvent.location
+          })
+          .eq('google_event_id', event.id);
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error syncing daily planner event:', error);
+    }
+  };
+
   const bulkExportTasks = async (tasks: any[]) => {
     if (!isConnected || !accessToken || tasks.length === 0) {
       toast({
@@ -484,6 +626,8 @@ export const useGoogleCalendar = () => {
     isConnected,
     loading,
     credentialsSet,
+    isSyncing,
+    lastSyncTime,
     signInToGoogle,
     signOutFromGoogle,
     createCalendarEvent,
@@ -492,6 +636,7 @@ export const useGoogleCalendar = () => {
     createDailyPlannerEvent,
     getUpcomingEvents,
     importTasksFromCalendar,
-    bulkExportTasks
+    bulkExportTasks,
+    syncCalendarEvents
   };
 };

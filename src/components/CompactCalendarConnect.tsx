@@ -10,7 +10,7 @@ interface CompactCalendarConnectProps {
 }
 
 const CompactCalendarConnect = ({ onCalendarClick }: CompactCalendarConnectProps) => {
-  const { isConnected, loading, signInToGoogle, credentialsSet } = useGoogleCalendar();
+  const { isConnected, loading, signInToGoogle, credentialsSet, isSyncing } = useGoogleCalendar();
 
   if (!credentialsSet) {
     return (
@@ -31,8 +31,8 @@ const CompactCalendarConnect = ({ onCalendarClick }: CompactCalendarConnectProps
         <>
           <Check className="h-4 w-4 text-green-600" />
           <span className="text-sm font-medium text-green-700">Calendar Connected</span>
-          <Badge variant="secondary" className="bg-green-100 text-green-800">
-            Synced
+          <Badge variant="secondary" className={`${isSyncing ? 'animate-pulse bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+            {isSyncing ? 'Syncing...' : 'Real-time Sync'}
           </Badge>
         </>
       ) : (

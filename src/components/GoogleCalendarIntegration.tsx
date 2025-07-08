@@ -16,10 +16,13 @@ const GoogleCalendarIntegration = ({ onEventCreated }: GoogleCalendarIntegration
     isConnected,
     loading,
     credentialsSet,
+    isSyncing,
+    lastSyncTime,
     signInToGoogle,
     signOutFromGoogle,
     createCalendarEvent,
-    getUpcomingEvents
+    getUpcomingEvents,
+    syncCalendarEvents
   } = useGoogleCalendar();
 
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
@@ -105,17 +108,32 @@ const GoogleCalendarIntegration = ({ onEventCreated }: GoogleCalendarIntegration
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Badge variant={isConnected ? "default" : "secondary"}>
-                {isConnected ? "Connected" : "Not Connected"}
+                {isConnected ? "Connected & Syncing" : "Not Connected"}
               </Badge>
               {isConnected && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={loadUpcomingEvents}
-                  disabled={loading}
-                >
-                  Refresh
-                </Button>
+                <>
+                  {isSyncing && (
+                    <Badge variant="outline" className="animate-pulse">
+                      Syncing...
+                    </Badge>
+                  )}
+                  {lastSyncTime && (
+                    <span className="text-xs text-gray-500">
+                      Last sync: {lastSyncTime.toLocaleTimeString()}
+                    </span>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      loadUpcomingEvents();
+                      syncCalendarEvents();
+                    }}
+                    disabled={loading || isSyncing}
+                  >
+                    {isSyncing ? 'Syncing...' : 'Refresh'}
+                  </Button>
+                </>
               )}
             </div>
             {isConnected ? (
